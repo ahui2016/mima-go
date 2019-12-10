@@ -13,13 +13,15 @@ type MimaItems struct {
 }
 
 // NewMimaItems 生成一个新的 MimaItems, 并对其中的 Items 进行初始化.
-func NewMimaItems() (items *MimaItems) {
+func NewMimaItems() *MimaItems {
+	items := new(MimaItems)
 	items.Items = list.New()
-	return
+	return items
 }
 
 // NewMima 生成一条新的记录, 插入到 MimaItems 里适当的位置, 并返回这条新记录.
-func (table *MimaItems) NewMima(title string) (mima *Mima) {
+func (table *MimaItems) NewMima(title string) *Mima {
+	mima := new(Mima)
 
 	// TODO: 在初始化时插入第一条记录, 然后这里可以简化.
 	if table.Items.Len() > 0 && len(title) == 0 {
@@ -31,7 +33,7 @@ func (table *MimaItems) NewMima(title string) (mima *Mima) {
 	mima.UpdatedAt = mima.CreatedAt
 
 	table.InsertByUpdatedAt(mima)
-	return
+	return mima
 }
 
 // InsertByUpdatedAt 把 mima 插入到适当的位置, 使链表保持有序.
