@@ -19,12 +19,14 @@ func NewMimaItems() *MimaItems {
 	return items
 }
 
+func (db *MimaItems) Init() {}
+
 // NewMima 生成一条新的记录, 插入到 MimaItems 里适当的位置, 并返回这条新记录.
-func (table *MimaItems) NewMima(title string) *Mima {
+func (db *MimaItems) NewMima(title string) *Mima {
 	mima := new(Mima)
 
 	// TODO: 在初始化时插入第一条记录, 然后这里可以简化.
-	if table.Items.Len() > 0 && len(title) == 0 {
+	if db.Items.Len() > 0 && len(title) == 0 {
 		panic("Title 标题长度必须大于零")
 	}
 
@@ -32,27 +34,27 @@ func (table *MimaItems) NewMima(title string) *Mima {
 	mima.CreatedAt = time.Now().Unix()
 	mima.UpdatedAt = mima.CreatedAt
 
-	table.InsertByUpdatedAt(mima)
+	db.InsertByUpdatedAt(mima)
 	return mima
 }
 
 // InsertByUpdatedAt 把 mima 插入到适当的位置, 使链表保持有序.
-func (table *MimaItems) InsertByUpdatedAt(mima *Mima) {
-	if table.Items.Len() == 0 {
-		table.Items.PushFront(mima)
+func (db *MimaItems) InsertByUpdatedAt(mima *Mima) {
+	if db.Items.Len() == 0 {
+		db.Items.PushFront(mima)
 		return
 	}
-	if e := table.findUpdatedBefore(mima); e != nil {
-		table.Items.InsertBefore(mima, e)
+	if e := db.findUpdatedBefore(mima); e != nil {
+		db.Items.InsertBefore(mima, e)
 	} else {
-		table.Items.PushBack(mima)
+		db.Items.PushBack(mima)
 	}
 }
 
 // findUpdatedBefore 寻找一条记录, 其更新日期早于参数 mima 的更新日期.
 // 如果找不到则返回 nil, 参数 mima 的更新日期是最早的.
-func (table *MimaItems) findUpdatedBefore(mima *Mima) *list.Element {
-	for e := table.Items.Front(); e != nil; e = e.Next() {
+func (db *MimaItems) findUpdatedBefore(mima *Mima) *list.Element {
+	for e := db.Items.Front(); e != nil; e = e.Next() {
 		v := e.Value.(*Mima)
 		if v.UpdatedAt <= mima.UpdatedAt {
 			return e

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// TestSortMima 测试 InsertByUpdatedAt 能否正确排序.
+// TestSortMima 用来测试 InsertByUpdatedAt 能否正确排序.
 func TestSortMima(t *testing.T) {
 	rand.Seed(42)
 	hours := rand.Perm(24)
