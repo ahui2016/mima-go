@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 )
 
-func newNonce() (nonce [NonceSize]byte) {
+func newNonce() (nonce Nonce) {
 	if _, err := rand.Read(nonce[:]); err != nil {
 		panic(err)
 	}

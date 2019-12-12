@@ -19,7 +19,13 @@ func NewMimaItems() *MimaItems {
 	return items
 }
 
+// Init 初始化数据库.
+// 即, 生成第一条记录, 并生成 mima.db
 func (db *MimaItems) Init() {}
+
+func (db *MimaItems) MakeFirstMima(key SecretKey) {
+
+}
 
 // NewMima 生成一条新的记录, 插入到 MimaItems 里适当的位置, 并返回这条新记录.
 func (db *MimaItems) NewMima(title string) *Mima {
@@ -79,7 +85,7 @@ type Mima struct {
 	// 一次性随机码, 用于加密 (必须) (唯一)
 	// 但鉴于 Nonce 具有足够的长度使随机生成的 nonce 也不用担心重复,
 	// 因此平时可偷懒不检查其唯一性.
-	Nonce [NonceSize]byte
+	Nonce Nonce
 
 	// 用户名
 	Username string

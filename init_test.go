@@ -8,15 +8,18 @@ import (
 // 使用命令 go test -v -o ./mima.exe
 // 注意参数 -o, 用来强制指定文件夹, 如果不使用该参数, 测试有可能使用临时文件夹.
 // 有时可能需要来回尝试 "./mima.exe" 或 "mima.exe".
-// 具体的正确路径需要手动修改.
 func TestPaths(t *testing.T) {
-	if filepath.ToSlash(baseDir) != filepath.ToSlash("D:\\ComputerScience\\golang\\myprojects\\mima-go") {
+	// 具体的 workingDir 需要手动修改.
+	workingDir := "D:\\ComputerScience\\golang\\myprojects\\mima-go"
+	// os.Chdir(workingDir)
+
+	if baseDir != workingDir {
 		t.Errorf(baseDir)
 	}
-	if filepath.ToSlash(dbDirPath) != filepath.ToSlash("D:\\ComputerScience\\golang\\myprojects\\mima-go\\mimadb") {
+	if dbDirPath != filepath.Join(workingDir, DBDir) {
 		t.Errorf(dbDirPath)
 	}
-	if filepath.ToSlash(dbFullPath) != filepath.ToSlash("D:\\ComputerScience\\golang\\myprojects\\mima-go\\mimadb\\mima.db") {
+	if dbFullPath != filepath.Join(workingDir, DBDir, DBName) {
 		t.Errorf(dbFullPath)
 	}
 }
