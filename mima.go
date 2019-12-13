@@ -23,15 +23,16 @@ func NewMimaItems() *MimaItems {
 // 即, 生成第一条记录, 并生成 mima.db
 func (db *MimaItems) Init() {}
 
+// MakeFirstMima 生成第一条记录, 用于保存密码.
 func (db *MimaItems) MakeFirstMima(key SecretKey) {
-
+	db.NewMima("")
+	// db.Notes =
 }
 
 // NewMima 生成一条新的记录, 插入到 MimaItems 里适当的位置, 并返回这条新记录.
 func (db *MimaItems) NewMima(title string) *Mima {
 	mima := new(Mima)
 
-	// TODO: 在初始化时插入第一条记录, 然后这里可以简化.
 	if db.Items.Len() > 0 && len(title) == 0 {
 		panic("Title 标题长度必须大于零")
 	}

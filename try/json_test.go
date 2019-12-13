@@ -2,46 +2,52 @@ package tryandtest
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"os"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/nacl/secretbox"
 )
 
+/*
+ * go test -v github.com/ahui2016/mima-go/try -run TestUnMarshal
+ */
 func TestUnMarshal(t *testing.T) {
-	mima := NewMima("hello")
-	want, err := json.Marshal(mima)
+	key := sha256.Sum256([]byte("我是密码"))
+	原始数据 := NewMima("我是标题")
+	加密后的数据 := 原始数据.Seal(&key)
+
+	临时文件, err := ioutil.TempFile("", "mima.*.db")
+	if err != nil {
+		panic(err)
+	}
+	defer os.Remove(临时文件.Name())
+	// t.Log(临时文件.Name())
+
+	if _, err := 临时文件.Write(加密后的数据); err != nil {
+		panic(err)
+	}
+	if err := 临时文件.Close(); err != nil {
+		panic(err)
+	}
+
+	文件内容, err := ioutil.ReadFile(临时文件.Name())
 	if err != nil {
 		panic(err)
 	}
 
-	tmpFile, err := ioutil.TempFile("", "mima.*.db")
-	if err != nil {
-		panic(err)
+	解密后的数据, ok := DecryptMima(文件内容, &key)
+	if !ok {
+		panic("解密失败")
 	}
-	defer os.Remove(tmpFile.Name())
-	// t.Error(tmpFile.Name())
+	// t.Log(解密后的数据)
 
-	if _, err := tmpFile.Write(want); err != nil {
-		panic(err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		panic(err)
-	}
-
-	content, err := ioutil.ReadFile(tmpFile.Name())
-	if err != nil {
-		panic(err)
-	}
-
-	got := new(Mima)
-	if err := json.Unmarshal(content, got); err != nil {
-		panic(err)
-	}
-
-	if !got.约等于(mima) {
-		t.Error(got)
+	if !解密后的数据.约等于(原始数据) {
+		t.Error(解密后的数据)
 	}
 }
 
@@ -70,14 +76,43 @@ type History struct {
 func NewMima(title string) *Mima {
 	mima := new(Mima)
 	mima.Title = title
+	mima.Notes = randomString()
 	mima.Nonce = newNonce()
 	mima.CreatedAt = time.Now().Unix()
 	mima.UpdatedAt = mima.CreatedAt
 	return mima
 }
 
+func DecryptMima(box []byte, key *[32]byte) (*Mima, bool) {
+	var nonce [24]byte
+	copy(nonce[:], box[:24])
+
+	blob, ok := secretbox.Open(nil, box[24:], &nonce, key)
+	if !ok {
+		return nil, ok
+	}
+	mima := new(Mima)
+	if err := json.Unmarshal(blob, mima); err != nil {
+		panic(err)
+	}
+	return mima, ok
+}
+
+func (mima *Mima) toJSON() []byte {
+	blob, err := json.Marshal(mima)
+	if err != nil {
+		panic(err)
+	}
+	return blob
+}
+
+func (mima *Mima) Seal(key *[32]byte) []byte {
+	return secretbox.Seal(mima.Nonce[:], mima.toJSON(), &mima.Nonce, key)
+}
+
 func (mima *Mima) 约等于(other *Mima) bool {
 	if mima.Title == other.Title &&
+		mima.Notes == other.Notes &&
 		mima.Nonce == other.Nonce &&
 		mima.CreatedAt == other.CreatedAt &&
 		mima.UpdatedAt == other.UpdatedAt {
@@ -91,4 +126,12 @@ func newNonce() (nonce [24]byte) {
 		panic(err)
 	}
 	return
+}
+
+func randomString() string {
+	someBytes := make([]byte, 255)
+	if _, err := rand.Read(someBytes); err != nil {
+		panic(err)
+	}
+	return base64.StdEncoding.EncodeToString(someBytes)
 }
