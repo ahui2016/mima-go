@@ -21,10 +21,10 @@ var (
 )
 
 // Nonce 是 [NonceSize]byte 的别名.
-type Nonce [NonceSize]byte
+type Nonce = [NonceSize]byte
 
 // SecretKey 是 *[KeySize]byte 的别名.
-type SecretKey *[KeySize]byte
+type SecretKey = *[KeySize]byte
 
 func init() {
 	baseDir = getBaseDir()

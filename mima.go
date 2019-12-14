@@ -1,74 +1,9 @@
 package main
 
 import (
-	"container/list"
-	"time"
+	"encoding/json"
+	"golang.org/x/crypto/nacl/secretbox"
 )
-
-// MimaItems 相当于一个数据表.
-type MimaItems struct {
-
-	// 原始数据, 按 UpdatedAt 排序.
-	Items *list.List
-}
-
-// NewMimaItems 生成一个新的 MimaItems, 并对其中的 Items 进行初始化.
-func NewMimaItems() *MimaItems {
-	items := new(MimaItems)
-	items.Items = list.New()
-	return items
-}
-
-// Init 初始化数据库.
-// 即, 生成第一条记录, 并生成 mima.db
-func (db *MimaItems) Init() {}
-
-// MakeFirstMima 生成第一条记录, 用于保存密码.
-func (db *MimaItems) MakeFirstMima(key SecretKey) {
-	db.NewMima("")
-	// db.Notes =
-}
-
-// NewMima 生成一条新的记录, 插入到 MimaItems 里适当的位置, 并返回这条新记录.
-func (db *MimaItems) NewMima(title string) *Mima {
-	mima := new(Mima)
-
-	if db.Items.Len() > 0 && len(title) == 0 {
-		panic("Title 标题长度必须大于零")
-	}
-
-	mima.Nonce = newNonce()
-	mima.CreatedAt = time.Now().Unix()
-	mima.UpdatedAt = mima.CreatedAt
-
-	db.InsertByUpdatedAt(mima)
-	return mima
-}
-
-// InsertByUpdatedAt 把 mima 插入到适当的位置, 使链表保持有序.
-func (db *MimaItems) InsertByUpdatedAt(mima *Mima) {
-	if db.Items.Len() == 0 {
-		db.Items.PushFront(mima)
-		return
-	}
-	if e := db.findUpdatedBefore(mima); e != nil {
-		db.Items.InsertBefore(mima, e)
-	} else {
-		db.Items.PushBack(mima)
-	}
-}
-
-// findUpdatedBefore 寻找一条记录, 其更新日期早于参数 mima 的更新日期.
-// 如果找不到则返回 nil, 参数 mima 的更新日期是最早的.
-func (db *MimaItems) findUpdatedBefore(mima *Mima) *list.Element {
-	for e := db.Items.Front(); e != nil; e = e.Next() {
-		v := e.Value.(*Mima)
-		if v.UpdatedAt <= mima.UpdatedAt {
-			return e
-		}
-	}
-	return nil
-}
 
 // Mima 用来表示一条记录.
 // 其中, 标题是必须的, 别名是准唯一的, Nonce 是必须且唯一的.
@@ -103,7 +38,9 @@ type Mima struct {
 	// 创建时间
 	CreatedAt int64
 
-	// 更新时间
+	// 当 UpdatedAt 等于 CreatedAt, 表示新增.
+	// 当 UpdatedAt 大于 CreatedAt, 表示更新.
+	// 当 UpdatedAt 为零, 表示需要彻底删除.
 	UpdatedAt int64
 
 	// 删除时间
@@ -113,12 +50,29 @@ type Mima struct {
 	HistoryItems []History
 }
 
+// ToJSON 把 mima 转换为 json 二进制数据.
+func (mima *Mima) ToJSON() []byte {
+	blob, err := json.Marshal(mima)
+	if err != nil {
+		panic(err)
+	}
+	return blob
+}
+
+// Seal 先把 mima 转换为 json, 再加密并返回二进制数据.
+func (mima *Mima) Seal(key SecretKey) []byte {
+	return secretbox.Seal(mima.Nonce[:], mima.ToJSON(), &mima.Nonce, key)
+}
+
 // History 用来保存修改历史.
 // 全部内容均直接保留当时的 Mima 内容, 不作任何修改.
 type History struct {
-	Title     string
-	Username  string
-	Password  string
-	Notes     string
+	Title    string
+	Username string
+	Password string
+	Notes    string
+
+	// 考虑到实际使用情景, 在一个 mima 的历史记录里面,
+	// UpdatedAt 应该是唯一的 (同一条记录不可能同时修改两次).
 	UpdatedAt int64
 }
