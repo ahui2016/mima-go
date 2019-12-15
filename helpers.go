@@ -19,3 +19,12 @@ func randomString() string {
 	}
 	return base64.StdEncoding.EncodeToString(someBytes)
 }
+
+/*
+func maxUint(a, b uint) uint {
+	if a > b {
+		return a
+	}
+	return b
+}
+*/

@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 )
 
 // 一些常量
@@ -12,6 +14,9 @@ const (
 
 	DBDir  = "mimadb"
 	DBName = "mima.db"
+
+	// 数据库碎片文件的后缀名
+	FragExt = ".db.frag"
 )
 
 var (
@@ -39,4 +44,10 @@ func getBaseDir() string {
 	}
 	path, _ = filepath.EvalSymlinks(path)
 	return filepath.Dir(path)
+}
+
+// NewFragmentName 返回一个新的数据库碎片文件名.
+func NewFragmentName() string {
+	name := strconv.FormatInt(time.Now().Unix(), 10)
+	return name + FragExt
 }

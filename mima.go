@@ -2,12 +2,17 @@ package main
 
 import (
 	"encoding/json"
+	"time"
+
 	"golang.org/x/crypto/nacl/secretbox"
 )
 
 // Mima 用来表示一条记录.
 // 其中, 标题是必须的, 别名是准唯一的, Nonce 是必须且唯一的.
 type Mima struct {
+
+	// (主键) (必须) (唯一) (自增)
+	ID uint
 
 	// 标题 (必须)
 	// 第一条记录的 Title 长度为零, 其他记录要求 Title 长度大于零.
@@ -48,6 +53,16 @@ type Mima struct {
 
 	// 修改历史
 	HistoryItems []History
+}
+
+// NewMima 生成一个新的 mima.
+func NewMima(title string) *Mima {
+	mima := new(Mima)
+	mima.Title = title
+	mima.Nonce = newNonce()
+	mima.CreatedAt = time.Now().Unix()
+	mima.UpdatedAt = mima.CreatedAt
+	return mima
 }
 
 // ToJSON 把 mima 转换为 json 二进制数据.
