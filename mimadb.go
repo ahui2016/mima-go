@@ -52,6 +52,18 @@ func (db *MimaItems) MakeFirstMima() {
 	}
 }
 
+// GetByID 凭 id 找 mima, 如果找不到就返回 nil.
+func (db *MimaItems) GetByID(id uint) *Mima {
+	// 这里的算法效率不高, 当预估数据量较大时需要改用更高效率的算法.
+	for e := db.Items.Front(); e != nil; e = e.Next() {
+		mima := e.Value.(*Mima)
+		if mima.ID == id {
+			return mima
+		}
+	}
+	return nil
+}
+
 // Add 新增一个 mima 到数据库中, 并生成一块数据库碎片.
 func (db *MimaItems) Add(mima *Mima) {
 	if db.Items.Len() == 0 {

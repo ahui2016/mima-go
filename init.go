@@ -12,8 +12,9 @@ const (
 	KeySize   = 32
 	NonceSize = 24
 
-	DBDir  = "mimadb"
-	DBName = "mima.db"
+	DBDir   = "mimadb"
+	DBName  = "mima.db"
+	TempDir = "temp_dir_for_test"
 
 	// 数据库碎片文件的后缀名
 	FragExt = ".db.frag"

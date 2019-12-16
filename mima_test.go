@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"math/rand"
 	"testing"
 	"time"
@@ -11,11 +12,12 @@ func TestSortMima(t *testing.T) {
 	rand.Seed(42)
 	hours := rand.Perm(24)
 
-	mimaItems := NewMimaItems()
+	key := sha256.Sum256([]byte("我是密码"))
+	mimaItems := NewMimaItems(&key)
 	for _, hour := range hours {
 		mima := new(Mima)
 		mima.UpdatedAt = time.Date(2019, time.May, 1, hour, 0, 0, 0, time.UTC).Unix()
-		mimaItems.InsertByUpdatedAt(mima)
+		mimaItems.insertByUpdatedAt(mima)
 	}
 
 	var got []int
