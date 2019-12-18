@@ -2,9 +2,6 @@ package main
 
 import (
 	"container/list"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"sync"
 )
 
@@ -35,22 +32,21 @@ func NewMimaDB(key SecretKey) *MimaDB {
 
 // Rebuild 读取数据库碎片, 整合到数据库文件中.
 // 每次启动程序, 初始化时, 自动执行一次 Rebuild.
-func (db *MimaDB) Rebuild() {}
+func (db *MimaDB) Rebuild() {
+	dbMustExist()
+	// backup
+}
 
 // MakeFirstMima 生成第一条记录, 用于保存密码.
 // 同时会生成数据库文件 mimadb/mima.db
 func (db *MimaDB) MakeFirstMima() {
-	if _, err := os.Stat(dbFullPath); !os.IsNotExist(err) {
-		panic("数据库文件已存在, 不可重复创建")
-	}
+	dbMustNotExist()
 	mima := NewMima("")
 	// mima.ID = 0 默认为零
 	mima.Notes = randomString()
 	db.Add(mima)
 	sealed := mima.Seal(db.key)
-	if err := ioutil.WriteFile(dbFullPath, sealed, 0644); err != nil {
-		panic(err)
-	}
+	writeFile(dbFullPath, sealed)
 }
 
 // GetByID 凭 id 找 mima, 如果找不到就返回 nil.
@@ -82,10 +78,7 @@ func (db *MimaDB) Add(mima *Mima) {
 	db.insertByUpdatedAt(mima)
 
 	sealed := mima.Seal(db.key)
-	fragmentPath := filepath.Join(dbDirPath, newFragmentName())
-	if err := ioutil.WriteFile(fragmentPath, sealed, 0644); err != nil {
-		panic(err)
-	}
+	writeFragFile(sealed)
 }
 
 // InsertByUpdatedAt 把 mima 插入到适当的位置, 使链表保持有序.

@@ -8,6 +8,8 @@ import (
 )
 
 // TestSortMima 用来测试 InsertByUpdatedAt 能否正确排序.
+// 单独运行一个测试函数 go test -v -o ./mima.exe -run TestSortMima
+// 或者 go test -v -o ./mima.exe github.com/ahui2016/mima-go -run TestSortMima
 func TestSortMima(t *testing.T) {
 	rand.Seed(42)
 	hours := rand.Perm(24)

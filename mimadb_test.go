@@ -1,9 +1,12 @@
 package main
 
+// 使用命令 go test -v -o ./mima.exe
+// 注意参数 -o, 用来强制指定文件夹, 如果不使用该参数, 测试有可能使用临时文件夹.
+// 有时可能需要来回尝试 "./mima.exe" 或 "mima.exe".
+
 import (
 	"crypto/sha256"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -13,15 +16,18 @@ import (
 	"golang.org/x/crypto/nacl/secretbox"
 )
 
-// 使用命令 go test -v -o ./mima.exe
-// 注意参数 -o, 用来强制指定文件夹, 如果不使用该参数, 测试有可能使用临时文件夹.
-// 有时可能需要来回尝试 "./mima.exe" 或 "mima.exe".
-func TestMakeFirstMima(t *testing.T) {
+// 用于在测试之前删除数据库文件 (dbFullPath in temp_dir_for_test)
+func removeDB() {
 	if err := os.Remove(dbFullPath); err != nil && !os.IsNotExist(err) {
 		panic(err)
 	}
+}
+
+func TestMakeFirstMima(t *testing.T) {
 	key := sha256.Sum256([]byte("我是密码"))
 	testDB := NewMimaDB(&key)
+
+	removeDB()
 	testDB.MakeFirstMima()
 
 	// 检查内存中的 mima 是否正确
@@ -54,32 +60,28 @@ func TestAddMoreMimas(t *testing.T) {
 		newRandomMima("六六六"),
 	}
 
-	if err := os.Remove(dbFullPath); err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
 	key := sha256.Sum256([]byte("我是密码"))
 	testDB := NewMimaDB(&key)
+
+	removeDB()
 	testDB.MakeFirstMima()
 
 	for _, mima := range want {
 		// 由于数据是按更新时间排序的, 为了使其有明显顺序, 因此明显地设置其更新时间.
 		time.Sleep(100 * time.Millisecond)
 		mima.UpdatedAt = time.Now().UnixNano()
-		t.Logf("%s, %d", mima.Title, mima.UpdatedAt)
 		testDB.Add(mima)
 	}
 
 	var got []*Mima
-	mimaFiles, err := ioutil.ReadDir(dbDirPath)
+	pattern := filepath.Join(dbDirPath, "*"+FragExt)
+	fragFiles, err := filepath.Glob(pattern)
 	if err != nil {
 		panic(err)
 	}
-	for _, f := range mimaFiles {
-		fragmentPath := filepath.Join(dbDirPath, f.Name())
-		mima := readAndDecrypt(fragmentPath, &key)
-		if mima.ID != 0 {
-			got = append(got, mima)
-		}
+	for _, f := range fragFiles {
+		mima := readAndDecrypt(f, &key)
+		got = append(got, mima)
 	}
 	sort.Slice(got, func(i, j int) bool {
 		return got[i].UpdatedAt < got[j].UpdatedAt
@@ -101,10 +103,7 @@ func newRandomMima(title string) *Mima {
 }
 
 func readAndDecrypt(fullpath string, key SecretKey) *Mima {
-	box, err := ioutil.ReadFile(fullpath)
-	if err != nil {
-		panic(err)
-	}
+	box := readFile(fullpath)
 	return mustDecryptMima(box, key)
 }
 
