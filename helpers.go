@@ -3,6 +3,8 @@ package main
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"strconv"
+	"time"
 )
 
 func newNonce() (nonce Nonce) {
@@ -20,11 +22,8 @@ func randomString() string {
 	return base64.StdEncoding.EncodeToString(someBytes)
 }
 
-/*
-func maxUint(a, b uint) uint {
-	if a > b {
-		return a
-	}
-	return b
+// NewFragmentName 返回一个新的数据库碎片文件名.
+func newFragmentName() string {
+	name := strconv.FormatInt(time.Now().UnixNano(), 10)
+	return name + FragExt
 }
-*/

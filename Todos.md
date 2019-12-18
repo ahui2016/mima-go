@@ -1,6 +1,6 @@
 # Todos
 
-- 关于自增 ID 的相关处理
+- 测试 MimaDB.Add
 
 ## Write to file
 

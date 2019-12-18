@@ -2,6 +2,7 @@ package main
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 // 一个 package 只能有一个 TestMain.
 func TestMain(m *testing.M) {
+	log.Println("Ding!")
 	dbDirPath = filepath.Join(baseDir, TempDir)
 	dbFullPath = filepath.Join(dbDirPath, DBName)
 	app := m.Run()
@@ -17,10 +19,13 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	for _, file := range tempFiles {
-		if err := os.Remove(filepath.Join(dbDirPath, file.Name())); err != nil {
+		tempFile := filepath.Join(dbDirPath, file.Name())
+		if err := os.Remove(tempFile); err != nil {
 			panic(err)
 		}
+		log.Printf("已删除 %s", tempFile)
 	}
+	log.Println("Dong!")
 	os.Exit(app)
 }
 

@@ -60,7 +60,7 @@ func NewMima(title string) *Mima {
 	mima := new(Mima)
 	mima.Title = title
 	mima.Nonce = newNonce()
-	mima.CreatedAt = time.Now().Unix()
+	mima.CreatedAt = time.Now().UnixNano()
 	mima.UpdatedAt = mima.CreatedAt
 	return mima
 }

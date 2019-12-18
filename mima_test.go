@@ -13,17 +13,17 @@ func TestSortMima(t *testing.T) {
 	hours := rand.Perm(24)
 
 	key := sha256.Sum256([]byte("我是密码"))
-	mimaItems := NewMimaItems(&key)
+	db := NewMimaDB(&key)
 	for _, hour := range hours {
 		mima := new(Mima)
-		mima.UpdatedAt = time.Date(2019, time.May, 1, hour, 0, 0, 0, time.UTC).Unix()
-		mimaItems.insertByUpdatedAt(mima)
+		mima.UpdatedAt = time.Date(2019, time.May, 1, hour, 0, 0, 0, time.UTC).UnixNano()
+		db.insertByUpdatedAt(mima)
 	}
 
 	var got []int
-	for e := mimaItems.Items.Front(); e != nil; e = e.Next() {
+	for e := db.Items.Front(); e != nil; e = e.Next() {
 		mima := e.Value.(*Mima)
-		updatedAt := time.Unix(mima.UpdatedAt, 0).UTC()
+		updatedAt := time.Unix(0, mima.UpdatedAt).UTC()
 		got = append(got, updatedAt.Hour())
 	}
 
