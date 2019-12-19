@@ -65,3 +65,13 @@ func readFile(fullpath string) []byte {
 	}
 	return content
 }
+
+// wrapErrors 把多个错误合并为一个错误.
+func wrapErrors(errs ...error) (wrapped error) {
+	for i, err := range errs {
+		if err != nil {
+			wrapped = fmt.Errorf("%d: %w", i, err)
+		}
+	}
+	return
+}

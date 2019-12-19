@@ -8,6 +8,8 @@ import (
 	"compress/gzip"
 	"os"
 	"path/filepath"
+
+	"github.com/ahui2016/mima-go/util"
 )
 
 // CreateTarball 把 filePaths 里的全部文件打包压缩, 新建文件 tarballFilePath.
@@ -19,22 +21,15 @@ func CreateTarball(tarballFilePath string, filePaths []string) error {
 	gzipWriter := gzip.NewWriter(file)
 	tarWriter := tar.NewWriter(gzipWriter)
 
+	var allErrors []error
 	for _, filePath := range filePaths {
 		if err := addFileToTar(filePath, tarWriter); err != nil {
-			return err
+			allErrors = append(allErrors, err)
+			break
 		}
 	}
-
-	if err := tarWriter.Close(); err != nil {
-		return err
-	}
-	if err := gzipWriter.Close(); err != nil {
-		return err
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	return nil
+	allErrors = append(allErrors, tarWriter.Close(), gzipWriter.Close(), file.Close())
+	return util.WrapErrors(allErrors...)
 }
 
 // 把数据库文件以及碎片文件备份到一个 tar 文件里.
