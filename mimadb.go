@@ -2,7 +2,10 @@ package main
 
 import (
 	"container/list"
+	"path/filepath"
 	"sync"
+
+	"github.com/ahui2016/mima-go/tarball"
 )
 
 // MimaDB 相当于一个数据表.
@@ -100,4 +103,19 @@ func (db *MimaDB) findUpdatedBefore(mima *Mima) *list.Element {
 		}
 	}
 	return nil
+}
+
+// backupToTar 把数据库文件以及碎片文件备份到一个 tarball 里.
+// 主要在 Rebuild 之前使用, 以防万一 rebuild 出错.
+func backupToTar() {
+	pattern := filepath.Join(dbDirPath, "*"+FragExt)
+	filePaths, err := filepath.Glob(pattern)
+	if err != nil {
+		panic(err)
+	}
+	filePaths = append(filePaths, dbFullPath)
+	tarballFilePath := filepath.Join(dbDirPath, newBackupName())
+	if err := tarball.CreateTarball(tarballFilePath, filePaths); err != nil {
+		panic(err)
+	}
 }

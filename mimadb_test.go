@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ahui2016/mima-go/util"
 	"golang.org/x/crypto/nacl/secretbox"
 )
 
@@ -92,6 +93,10 @@ func TestAddMoreMimas(t *testing.T) {
 			t.Error("从数据库碎片文件中恢复的 mima 与内存中的 mima 不一致")
 		}
 	}
+
+	t.Run("TestBackup", func(t *testing.T) {
+		backupToTar()
+	})
 }
 
 func newRandomMima(title string) *Mima {
@@ -103,7 +108,7 @@ func newRandomMima(title string) *Mima {
 }
 
 func readAndDecrypt(fullpath string, key SecretKey) *Mima {
-	box := readFile(fullpath)
+	box := util.ReadFile(fullpath)
 	return mustDecryptMima(box, key)
 }
 

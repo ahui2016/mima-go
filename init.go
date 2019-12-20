@@ -16,6 +16,9 @@ const (
 
 	// 数据库碎片文件的后缀名
 	FragExt = ".db.frag"
+
+	// 数据库备份文件的后缀名
+	tarballExt = ".tar.gz"
 )
 
 var (
