@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/ahui2016/mima-go/tarball"
+	"github.com/ahui2016/mima-go/util"
 )
 
 // MimaDB 相当于一个数据表.
@@ -37,7 +38,12 @@ func NewMimaDB(key SecretKey) *MimaDB {
 // 每次启动程序, 初始化时, 自动执行一次 Rebuild.
 func (db *MimaDB) Rebuild() {
 	dbMustExist()
-	// backup
+	backupToTar()
+
+	scanner := util.NewFileScanner(dbFullPath)
+	for scanner.Scan() {
+
+	}
 }
 
 // MakeFirstMima 生成第一条记录, 用于保存密码.
@@ -84,6 +90,14 @@ func (db *MimaDB) Add(mima *Mima) {
 	writeFragFile(sealed)
 }
 
+// mustBeEmpty 确认内存中的数据库必须为空.
+// 通常当不为空时不可进行初始化.
+func (db *MimaDB) mustBeEmpty() {
+	if db.Items.Len() != 0 {
+		panic("初始化失败: 内存中的数据库已有数据")
+	}
+}
+
 // InsertByUpdatedAt 把 mima 插入到适当的位置, 使链表保持有序.
 func (db *MimaDB) insertByUpdatedAt(mima *Mima) {
 	if e := db.findUpdatedBefore(mima); e != nil {
@@ -107,15 +121,22 @@ func (db *MimaDB) findUpdatedBefore(mima *Mima) *list.Element {
 
 // backupToTar 把数据库文件以及碎片文件备份到一个 tarball 里.
 // 主要在 Rebuild 之前使用, 以防万一 rebuild 出错.
-func backupToTar() {
+// 为了方便测试返回 tarball 的完整路径.
+func backupToTar() (filePath string) {
+	files := filesToBackup()
+	filePath = filepath.Join(dbDirPath, newBackupName())
+	if err := tarball.Create(filePath, files); err != nil {
+		panic(err)
+	}
+	return
+}
+
+// filesToBackup 返回需要备份的文件的完整路径.
+func filesToBackup() []string {
 	pattern := filepath.Join(dbDirPath, "*"+FragExt)
 	filePaths, err := filepath.Glob(pattern)
 	if err != nil {
 		panic(err)
 	}
-	filePaths = append(filePaths, dbFullPath)
-	tarballFilePath := filepath.Join(dbDirPath, newBackupName())
-	if err := tarball.CreateTarball(tarballFilePath, filePaths); err != nil {
-		panic(err)
-	}
+	return append(filePaths, dbFullPath)
 }

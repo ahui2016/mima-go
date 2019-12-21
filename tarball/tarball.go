@@ -14,8 +14,8 @@ import (
 	"github.com/ahui2016/mima-go/util"
 )
 
-// CreateTarball 把 filePaths 里的全部文件打包压缩, 新建文件 tarballFilePath.
-func CreateTarball(tarballFilePath string, filePaths []string) error {
+// Create 把 filePaths 里的全部文件打包压缩, 新建文件 tarballFilePath.
+func Create(tarballFilePath string, filePaths []string) error {
 	file, err := os.Create(tarballFilePath)
 	if err != nil {
 		return err
@@ -80,6 +80,7 @@ func NewReader(filePath string) *Reader {
 
 	gzipReader, err := gzip.NewReader(file)
 	if err != nil {
+		err = util.WrapErrors(file.Close(), err)
 		panic(err)
 	}
 	tr.gzipReader = gzipReader
@@ -89,24 +90,26 @@ func NewReader(filePath string) *Reader {
 
 // Sha512 返回一个 tarball 里面全部文件的 SHA512 checksum.
 // 只适用于 tarball 里只有文件, 没有文件夹的情况.
-func (tr Reader) Sha512() (checksums [][sha512.Size]byte) {
+func (tr Reader) Sha512() (checksums [][]byte) {
 	for {
 		_, err := tr.tarReader.Next()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			tr.Close()
+			// 错误处理强迫症, 不想漏掉任何一个错误信息.
+			err = util.WrapErrors(tr.Close(), err)
 			panic(err)
 		}
 		data, err := ioutil.ReadAll(tr.tarReader)
 		if err != nil {
-			tr.Close()
+			err = util.WrapErrors(tr.Close(), err)
 			panic(err)
 		}
-		checksums = append(checksums, sha512.Sum512(data))
+		sum := sha512.Sum512(data)
+		checksums = append(checksums, sum[:])
 	}
-	return checksums
+	return
 }
 
 // Close 依次关闭 tr 里的 各个 reader, 并把错误合并后返回.

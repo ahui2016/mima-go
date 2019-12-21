@@ -5,14 +5,18 @@ package main
 // 有时可能需要来回尝试 "./mima.exe" 或 "mima.exe".
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/json"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"testing"
 	"time"
 
+	"github.com/ahui2016/mima-go/tarball"
 	"github.com/ahui2016/mima-go/util"
 	"golang.org/x/crypto/nacl/secretbox"
 )
@@ -94,9 +98,42 @@ func TestAddMoreMimas(t *testing.T) {
 		}
 	}
 
+	// 由于刚好需要用到这里 "母测试" 产生的文件, 因此在此添加 "子测试".
+	// 测试备份是否成功 (检查备份文件 tarball 的内容).
 	t.Run("TestBackup", func(t *testing.T) {
-		backupToTar()
+		var (
+			sumOfOrigins [][]byte // 原始文件的 checksum
+			sumOfBackups [][]byte // 备份文件的 checksum
+		)
+		tarFilePath := backupToTar()
+		tarballReader := tarball.NewReader(tarFilePath)
+		sumOfBackups = tarballReader.Sha512()
+		if err := tarballReader.Close(); err != nil {
+			panic(err)
+		}
+
+		files := filesToBackup()
+		sumOfOrigins = getChecksums(files)
+
+		for i := 0; i < len(sumOfOrigins); i++ {
+			if !bytes.Equal(sumOfOrigins[i], sumOfBackups[i]) {
+				t.Errorf("第 %d 个文件的备份与原文件的 checksum 不一致", i+1)
+			}
+		}
 	})
+}
+
+// getChecksums 返回 files(完整路径) 的 SHA512 checksum.
+func getChecksums(files []string) (checksums [][]byte) {
+	for _, file := range files {
+		content, err := ioutil.ReadFile(file)
+		if err != nil {
+			panic(err)
+		}
+		sum := sha512.Sum512(content)
+		checksums = append(checksums, sum[:])
+	}
+	return
 }
 
 func newRandomMima(title string) *Mima {

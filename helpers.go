@@ -33,7 +33,7 @@ func dbMustNotExist() {
 }
 
 // 确保数据库文件已存在, 如果不存在则报错.
-func dbMustExist() {
+func dbFileMustExist() {
 	if _, err := os.Stat(dbFullPath); os.IsNotExist(err) {
 		panic("需要数据库文件, 但不存在")
 	}
