@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"time"
 
 	"golang.org/x/crypto/nacl/secretbox"
@@ -12,7 +13,7 @@ import (
 type Mima struct {
 
 	// (主键) (必须) (唯一) (自增)
-	ID uint
+	ID int
 
 	// 标题 (必须)
 	// 第一条记录的 Title 长度为零, 其他记录要求 Title 长度大于零.
@@ -65,18 +66,38 @@ func NewMima(title string) *Mima {
 	return mima
 }
 
-// ToJSON 把 mima 转换为 json 二进制数据.
-func (mima *Mima) ToJSON() []byte {
+// DecryptToMima 从已加密数据中解密出一个 Mima 来.
+// 用于从数据库文件中读取数据进内存数据库.
+func DecryptToMima(box []byte, key SecretKey) (mima *Mima, ok bool) {
+	if len(box) < NonceSize {
+		log.Println("It's not a secretbox.")
+		return nil, false
+	}
+	var nonce Nonce
+	copy(nonce[:], box[:NonceSize])
+	mimaJSON, ok := secretbox.Open(nil, box[NonceSize:], &nonce, key)
+	if !ok {
+		return nil, false
+	}
+	if err := json.Unmarshal(mimaJSON, mima); err != nil {
+		log.Println(err)
+		return nil, false
+	}
+	return mima, true
+}
+
+// Seal 先把 mima 转换为 json, 再加密并返回二进制数据.
+func (mima *Mima) Seal(key SecretKey) []byte {
+	return secretbox.Seal(mima.Nonce[:], mima.toJSON(), &mima.Nonce, key)
+}
+
+// toJSON 把 mima 转换为 json 二进制数据.
+func (mima *Mima) toJSON() []byte {
 	blob, err := json.Marshal(mima)
 	if err != nil {
 		panic(err)
 	}
 	return blob
-}
-
-// Seal 先把 mima 转换为 json, 再加密并返回二进制数据.
-func (mima *Mima) Seal(key SecretKey) []byte {
-	return secretbox.Seal(mima.Nonce[:], mima.ToJSON(), &mima.Nonce, key)
 }
 
 // History 用来保存修改历史.

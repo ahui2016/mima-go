@@ -2,6 +2,7 @@ package main
 
 import (
 	"container/list"
+	"log"
 	"path/filepath"
 	"sync"
 
@@ -15,7 +16,7 @@ type MimaDB struct {
 	sync.RWMutex
 
 	// 主要用于 MimaDB.Add 中
-	CurrentID uint
+	CurrentID int
 
 	// 原始数据, 按 UpdatedAt 排序.
 	Items *list.List
@@ -36,14 +37,27 @@ func NewMimaDB(key SecretKey) *MimaDB {
 
 // Rebuild 读取数据库碎片, 整合到数据库文件中.
 // 每次启动程序, 初始化时, 自动执行一次 Rebuild.
-func (db *MimaDB) Rebuild() {
-	dbMustExist()
+func (db *MimaDB) Rebuild() bool {
+	db.mustBeEmpty()
+	dbFileMustExist()
 	backupToTar()
 
 	scanner := util.NewFileScanner(dbFullPath)
 	for scanner.Scan() {
-
+		box := scanner.Bytes()
+		mima, ok := DecryptToMima(box, db.key)
+		if !ok {
+			return false
+		}
+		mima.ID = db.CurrentID
+		db.CurrentID++
+		db.Items.PushBack(mima)
 	}
+	if err := scanner.Err(); err != nil {
+		log.Println(err)
+		return false
+	}
+	return true
 }
 
 // MakeFirstMima 生成第一条记录, 用于保存密码.
@@ -59,7 +73,7 @@ func (db *MimaDB) MakeFirstMima() {
 }
 
 // GetByID 凭 id 找 mima, 如果找不到就返回 nil.
-func (db *MimaDB) GetByID(id uint) *Mima {
+func (db *MimaDB) GetByID(id int) *Mima {
 	// 这里的算法效率不高, 当预估数据量较大时需要改用更高效率的算法.
 	for e := db.Items.Front(); e != nil; e = e.Next() {
 		mima := e.Value.(*Mima)
