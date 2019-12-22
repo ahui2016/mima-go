@@ -46,10 +46,11 @@ type Mima struct {
 
 	// 当 UpdatedAt 等于 CreatedAt, 表示新增.
 	// 当 UpdatedAt 大于 CreatedAt, 表示更新.
+	// (注意 UpdatedAt 等于 原UpdatedAt 的情况, 可能表示软删除)
 	// 当 UpdatedAt 为零, 表示需要彻底删除.
 	UpdatedAt int64
 
-	// 删除时间
+	// 当 DeletedAt 大于零, 表示需要软删除.
 	DeletedAt int64
 
 	// 修改历史
@@ -85,6 +86,23 @@ func DecryptToMima(box []byte, key SecretKey) (*Mima, bool) {
 		return nil, false
 	}
 	return mima, true
+}
+
+// Update 以数据库碎片中的内容为准, 更新内存中的条目. (不包括软删除)
+func (mima *Mima) Update(fragment *Mima) {
+	mima.Title = fragment.Title
+	mima.Alias = fragment.Alias
+	mima.Username = fragment.Username
+	mima.Password = fragment.Password
+	mima.Notes = fragment.Notes
+	mima.Favorite = fragment.Favorite
+	mima.UpdatedAt = fragment.UpdatedAt
+	mima.HistoryItems = fragment.HistoryItems
+}
+
+// Delete 更新删除时间, 即软删除.
+func (mima *Mima) Delete() {
+	mima.DeletedAt = time.Now().UnixNano()
 }
 
 // Seal 先把 mima 转换为 json, 再加密并返回二进制数据.

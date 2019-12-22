@@ -1,13 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"container/list"
+	"fmt"
 	"log"
-	"path/filepath"
-	"sort"
+	"os"
 	"sync"
 
-	"github.com/ahui2016/mima-go/tarball"
 	"github.com/ahui2016/mima-go/util"
 )
 
@@ -43,13 +43,13 @@ func (db *MimaDB) Rebuild() bool {
 	dbFileMustExist()
 	backupToTar()
 	db.scanDBtoMemory()
+	if ok := db.readFragFilesAndUpdate(); !ok {
+		return false
+	}
+	if ok := db.rewriteDBFile(); !ok {
+		return false
+	}
 
-	// for _, f := range fragFilePaths() {
-	// 	mima := readAndDecrypt(f, db.key)
-	// }
-	return false
-	// 读取碎片
-	// 重写数据库文件
 	// 删除碎片
 }
 
@@ -71,6 +71,72 @@ func (db *MimaDB) scanDBtoMemory() {
 	}
 }
 
+// readFragFilesAndUpdate 读取数据库碎片文件, 并根据其内容更新内存数据库.
+// 分为 新增, 更新, 软删除, 彻底删除 四种情形.
+func (db *MimaDB) readFragFilesAndUpdate() bool {
+	for _, f := range fragFilePaths() {
+		mima, ok := readAndDecrypt(f, db.key)
+		if !ok {
+			return false
+		}
+		if mima.UpdatedAt == mima.CreatedAt {
+			// 新增
+			db.insertByUpdatedAt(mima)
+			continue
+		}
+
+		item := db.GetByID(mima.ID)
+		if item == nil {
+			log.Printf("NotFound: 找不到 id: %d 的条目", mima.ID)
+			return false
+		}
+
+		if mima.UpdatedAt > mima.CreatedAt {
+			// 更新
+			item.Update(mima)
+			continue
+		}
+		if mima.DeletedAt > 0 {
+			// 软删除
+			item.Delete()
+			continue
+		}
+		if mima.UpdatedAt == 0 {
+			// 彻底删除
+			if err := db.DeleteByID(mima.ID); err != nil {
+				log.Println(err)
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// rewriteDBFile 覆盖重写数据库文件, 将其更新为当前内存数据库的内容.
+func (db *MimaDB) rewriteDBFile() bool {
+	dbFile, err := os.Create(dbFullPath)
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+	defer dbFile.Close()
+
+	dbWriter := bufio.NewWriter(dbFile)
+	for e := db.Items.Front(); e != nil; e = e.Next() {
+		mima := e.Value.(*Mima)
+		sealed := mima.Seal(db.key)
+		if err := bufWriteln(dbWriter, sealed); err != nil {
+			log.Println(err)
+			return false
+		}
+	}
+	if err := dbWriter.Flush(); err != nil {
+		log.Println(err)
+		return false
+	}
+	return true
+}
+
 // MakeFirstMima 生成第一条记录, 用于保存密码.
 // 同时会生成数据库文件 mimadb/mima.db
 func (db *MimaDB) MakeFirstMima() {
@@ -85,11 +151,18 @@ func (db *MimaDB) MakeFirstMima() {
 
 // GetByID 凭 id 找 mima, 如果找不到就返回 nil.
 func (db *MimaDB) GetByID(id int) *Mima {
+	if e := db.getElementByID(id); e != nil {
+		return e.Value.(*Mima)
+	}
+	return nil
+}
+
+func (db *MimaDB) getElementByID(id int) *list.Element {
 	// 这里的算法效率不高, 当预估数据量较大时需要改用更高效率的算法.
 	for e := db.Items.Front(); e != nil; e = e.Next() {
 		mima := e.Value.(*Mima)
 		if mima.ID == id {
-			return mima
+			return e
 		}
 	}
 	return nil
@@ -113,6 +186,16 @@ func (db *MimaDB) Add(mima *Mima) {
 
 	sealed := mima.Seal(db.key)
 	writeFragFile(sealed)
+}
+
+// DeleteByID 删除内存数据库中的指定条目.
+func (db *MimaDB) DeleteByID(id int) error {
+	e := db.getElementByID(id)
+	if e == nil {
+		return fmt.Errorf("NotFound: 找不到 id: %d 的条目", id)
+	}
+	db.Items.Remove(e)
+	return nil
 }
 
 // mustBeEmpty 确认内存中的数据库必须为空.
@@ -142,38 +225,4 @@ func (db *MimaDB) findUpdatedBefore(mima *Mima) *list.Element {
 		}
 	}
 	return nil
-}
-
-// backupToTar 把数据库文件以及碎片文件备份到一个 tarball 里.
-// 主要在 Rebuild 之前使用, 以防万一 rebuild 出错.
-// 为了方便测试返回 tarball 的完整路径.
-func backupToTar() (filePath string) {
-	files := filesToBackup()
-	filePath = filepath.Join(dbDirPath, newBackupName())
-	if err := tarball.Create(filePath, files); err != nil {
-		panic(err)
-	}
-	return
-}
-
-// filesToBackup 返回需要备份的文件的完整路径.
-func filesToBackup() []string {
-	filePaths := fragFilePaths()
-	return append(filePaths, dbFullPath)
-}
-
-// fragFilePaths 返回数据库碎片文件的完整路径, 并且已排序.
-func fragFilePaths() []string {
-	pattern := filepath.Join(dbDirPath, "*"+FragExt)
-	filePaths, err := filepath.Glob(pattern)
-	if err != nil {
-		panic(err)
-	}
-	sort.Strings(filePaths)
-	return filePaths
-}
-
-func readAndDecrypt(fullpath string, key SecretKey) (*Mima, bool) {
-	box := util.ReadFile(fullpath)
-	return DecryptToMima(box, key)
 }
