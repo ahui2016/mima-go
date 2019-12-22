@@ -68,7 +68,7 @@ func NewMima(title string) *Mima {
 
 // DecryptToMima 从已加密数据中解密出一个 Mima 来.
 // 用于从数据库文件中读取数据进内存数据库.
-func DecryptToMima(box []byte, key SecretKey) (mima *Mima, ok bool) {
+func DecryptToMima(box []byte, key SecretKey) (*Mima, bool) {
 	if len(box) < NonceSize {
 		log.Println("It's not a secretbox.")
 		return nil, false
@@ -79,6 +79,7 @@ func DecryptToMima(box []byte, key SecretKey) (mima *Mima, ok bool) {
 	if !ok {
 		return nil, false
 	}
+	var mima = new(Mima)
 	if err := json.Unmarshal(mimaJSON, mima); err != nil {
 		log.Println(err)
 		return nil, false

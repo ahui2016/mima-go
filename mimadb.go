@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"log"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/ahui2016/mima-go/tarball"
@@ -41,23 +42,33 @@ func (db *MimaDB) Rebuild() bool {
 	db.mustBeEmpty()
 	dbFileMustExist()
 	backupToTar()
+	db.scanDBtoMemory()
 
+	// for _, f := range fragFilePaths() {
+	// 	mima := readAndDecrypt(f, db.key)
+	// }
+	return false
+	// 读取碎片
+	// 重写数据库文件
+	// 删除碎片
+}
+
+// scanDBtoMemory 读取 dbFullPath, 填充 MimaDB.
+func (db *MimaDB) scanDBtoMemory() {
 	scanner := util.NewFileScanner(dbFullPath)
 	for scanner.Scan() {
 		box := scanner.Bytes()
 		mima, ok := DecryptToMima(box, db.key)
 		if !ok {
-			return false
+			log.Fatal("在初始化阶段解密失败")
 		}
 		mima.ID = db.CurrentID
 		db.CurrentID++
 		db.Items.PushBack(mima)
 	}
 	if err := scanner.Err(); err != nil {
-		log.Println(err)
-		return false
+		log.Fatal(err)
 	}
-	return true
 }
 
 // MakeFirstMima 生成第一条记录, 用于保存密码.
@@ -147,10 +158,22 @@ func backupToTar() (filePath string) {
 
 // filesToBackup 返回需要备份的文件的完整路径.
 func filesToBackup() []string {
+	filePaths := fragFilePaths()
+	return append(filePaths, dbFullPath)
+}
+
+// fragFilePaths 返回数据库碎片文件的完整路径, 并且已排序.
+func fragFilePaths() []string {
 	pattern := filepath.Join(dbDirPath, "*"+FragExt)
 	filePaths, err := filepath.Glob(pattern)
 	if err != nil {
 		panic(err)
 	}
-	return append(filePaths, dbFullPath)
+	sort.Strings(filePaths)
+	return filePaths
+}
+
+func readAndDecrypt(fullpath string, key SecretKey) (*Mima, bool) {
+	box := util.ReadFile(fullpath)
+	return DecryptToMima(box, key)
 }

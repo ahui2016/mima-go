@@ -8,17 +8,12 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"crypto/sha512"
-	"encoding/json"
 	"io/ioutil"
 	"os"
-	"path/filepath"
-	"sort"
 	"testing"
 	"time"
 
 	"github.com/ahui2016/mima-go/tarball"
-	"github.com/ahui2016/mima-go/util"
-	"golang.org/x/crypto/nacl/secretbox"
 )
 
 // 用于在测试之前删除数据库文件 (dbFullPath in temp_dir_for_test)
@@ -52,22 +47,25 @@ func TestMakeFirstMima(t *testing.T) {
 	if _, err := os.Stat(dbFullPath); os.IsNotExist(err) {
 		t.Errorf("数据库文件 %s 应存在, 但结果不存在", dbFullPath)
 	}
-	解密后的数据 := readAndDecrypt(dbFullPath, &key)
-	if !约等于(解密后的数据, mima) {
-		t.Error("从数据库文件中恢复的 mima 与内存中的 mima 不一致")
+	解密后的数据, ok := readAndDecrypt(dbFullPath, &key)
+	if !ok {
+		t.Errorf("获取碎片内容失败: %s", dbFullPath)
+	} else {
+		if !约等于(解密后的数据, mima) {
+			t.Error("从数据库文件中恢复的 mima 与内存中的 mima 不一致")
+		}
 	}
 }
 
 // 测试增加多条记录的情形
 func TestAddMoreMimas(t *testing.T) {
 	want := []*Mima{
+		newRandomMima("鹅鹅鹅"),
 		newRandomMima("二二二"),
 		newRandomMima("六六六"),
 	}
-
 	key := sha256.Sum256([]byte("我是密码"))
 	testDB := NewMimaDB(&key)
-
 	removeDB()
 	testDB.MakeFirstMima()
 
@@ -78,19 +76,25 @@ func TestAddMoreMimas(t *testing.T) {
 		testDB.Add(mima)
 	}
 
-	var got []*Mima
-	pattern := filepath.Join(dbDirPath, "*"+FragExt)
-	fragFiles, err := filepath.Glob(pattern)
-	if err != nil {
-		panic(err)
-	}
-	for _, f := range fragFiles {
-		mima := readAndDecrypt(f, &key)
-		got = append(got, mima)
-	}
-	sort.Slice(got, func(i, j int) bool {
-		return got[i].UpdatedAt < got[j].UpdatedAt
+	filePaths := fragFilePaths()
+	// TestFragFilePaths 测试所获取的数据库碎片文件路径是否升序排列.
+	t.Run("TestFragFilePaths", func(t *testing.T) {
+		for i := 0; i < len(filePaths)-1; i++ {
+			if filePaths[i] >= filePaths[i+1] {
+				t.Errorf("第 %d 个大于或等于第 %d 个", i, i+1)
+			}
+		}
 	})
+
+	var got []*Mima
+	for _, f := range filePaths {
+		mima, ok := readAndDecrypt(f, &key)
+		if !ok {
+			t.Errorf("获取碎片内容失败: %s", f)
+		} else {
+			got = append(got, mima)
+		}
+	}
 
 	for i := 0; i < len(want); i++ {
 		if !约等于(want[i], got[i]) {
@@ -141,34 +145,6 @@ func newRandomMima(title string) *Mima {
 	mima.Username = randomString()
 	mima.Password = randomString()
 	mima.Notes = randomString()
-	return mima
-}
-
-func readAndDecrypt(fullpath string, key SecretKey) *Mima {
-	box := util.ReadFile(fullpath)
-	return mustDecryptMima(box, key)
-}
-
-func decryptMima(box []byte, key SecretKey) (*Mima, bool) {
-	var nonce [24]byte
-	copy(nonce[:], box[:24])
-
-	blob, ok := secretbox.Open(nil, box[24:], &nonce, key)
-	if !ok {
-		return nil, ok
-	}
-	mima := new(Mima)
-	if err := json.Unmarshal(blob, mima); err != nil {
-		panic(err)
-	}
-	return mima, ok
-}
-
-func mustDecryptMima(box []byte, key SecretKey) *Mima {
-	mima, ok := decryptMima(box, key)
-	if !ok {
-		panic("解密失败")
-	}
 	return mima
 }
 
