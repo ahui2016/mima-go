@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"log"
+	"errors"
 	"time"
 
 	"golang.org/x/crypto/nacl/secretbox"
@@ -58,34 +58,36 @@ type Mima struct {
 }
 
 // NewMima 生成一个新的 mima.
-func NewMima(title string) *Mima {
+func NewMima(title string) (*Mima, error) {
+	nonce, err := newNonce()
+	if err != nil {
+		return nil, err
+	}
 	mima := new(Mima)
 	mima.Title = title
-	mima.Nonce = newNonce()
+	mima.Nonce = nonce
 	mima.CreatedAt = time.Now().UnixNano()
 	mima.UpdatedAt = mima.CreatedAt
-	return mima
+	return mima, nil
 }
 
 // DecryptToMima 从已加密数据中解密出一个 Mima 来.
 // 用于从数据库文件中读取数据进内存数据库.
-func DecryptToMima(box []byte, key SecretKey) (*Mima, bool) {
+func DecryptToMima(box []byte, key SecretKey) (*Mima, error) {
 	if len(box) < NonceSize {
-		log.Println("It's not a secretbox.")
-		return nil, false
+		return nil, errors.New("it's not a secretbox")
 	}
 	var nonce Nonce
 	copy(nonce[:], box[:NonceSize])
 	mimaJSON, ok := secretbox.Open(nil, box[NonceSize:], &nonce, key)
 	if !ok {
-		return nil, false
+		return nil, errors.New("secretbox open fail")
 	}
 	var mima = new(Mima)
 	if err := json.Unmarshal(mimaJSON, mima); err != nil {
-		log.Println(err)
-		return nil, false
+		return nil, err
 	}
-	return mima, true
+	return mima, nil
 }
 
 // Update 以数据库碎片中的内容为准, 更新内存中的条目. (不包括软删除)

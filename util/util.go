@@ -3,7 +3,6 @@ package util
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 )
 
@@ -15,15 +14,6 @@ func WrapErrors(allErrors ...error) (wrapped error) {
 		}
 	}
 	return
-}
-
-// ReadFile 读取一个文件的全部内容.
-func ReadFile(fullpath string) []byte {
-	content, err := ioutil.ReadFile(fullpath)
-	if err != nil {
-		panic(err)
-	}
-	return content
 }
 
 // NewFileScanner 打开指定文件并返回一个 Scanner, 以准备开始逐行读取文件内容.

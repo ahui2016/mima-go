@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 )
@@ -25,6 +26,8 @@ var (
 	baseDir    string
 	dbDirPath  string
 	dbFullPath string
+
+	dbFileNotFound error
 )
 
 // Nonce 是 [NonceSize]byte 的别名.
@@ -37,6 +40,7 @@ func init() {
 	baseDir = getBaseDir()
 	dbDirPath = filepath.Join(baseDir, DBDir)
 	dbFullPath = filepath.Join(dbDirPath, DBName)
+	dbFileNotFound = errors.New("找不到数据库文件")
 }
 
 func getBaseDir() string {

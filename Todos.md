@@ -1,6 +1,6 @@
 # Todos
 
-- 测试 MimaDB.Add
+- 错误处理改用 log
 
 ## Write to file
 

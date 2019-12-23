@@ -70,27 +70,26 @@ type Reader struct {
 
 // NewReader 返回一个新的 *tarball.Reader.
 // 包括打开文件以及相关 reader.
-func NewReader(filePath string) *Reader {
+func NewReader(filePath string) (*Reader, error) {
 	tr := new(Reader)
 	file, err := os.Open(filePath)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	tr.file = file
 
 	gzipReader, err := gzip.NewReader(file)
 	if err != nil {
-		err = util.WrapErrors(file.Close(), err)
-		panic(err)
+		return nil, util.WrapErrors(file.Close(), err)
 	}
 	tr.gzipReader = gzipReader
 	tr.tarReader = tar.NewReader(gzipReader)
-	return tr
+	return tr, nil
 }
 
 // Sha512 返回一个 tarball 里面全部文件的 SHA512 checksum.
 // 只适用于 tarball 里只有文件, 没有文件夹的情况.
-func (tr Reader) Sha512() (checksums [][]byte) {
+func (tr Reader) Sha512() (checksums [][]byte, err error) {
 	for {
 		_, err := tr.tarReader.Next()
 		if err == io.EOF {
@@ -98,13 +97,13 @@ func (tr Reader) Sha512() (checksums [][]byte) {
 		}
 		if err != nil {
 			// 错误处理强迫症, 不想漏掉任何一个错误信息.
-			err = util.WrapErrors(tr.Close(), err)
-			panic(err)
+			return nil, util.WrapErrors(tr.Close(), err)
 		}
-		data, err := ioutil.ReadAll(tr.tarReader)
+
+		var data []byte
+		data, err = ioutil.ReadAll(tr.tarReader)
 		if err != nil {
-			err = util.WrapErrors(tr.Close(), err)
-			panic(err)
+			return nil, util.WrapErrors(tr.Close(), err)
 		}
 		sum := sha512.Sum512(data)
 		checksums = append(checksums, sum[:])

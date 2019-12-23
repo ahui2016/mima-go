@@ -12,13 +12,10 @@ import (
 	"time"
 
 	"github.com/ahui2016/mima-go/tarball"
-	"github.com/ahui2016/mima-go/util"
 )
 
-func newNonce() (nonce Nonce) {
-	if _, err := rand.Read(nonce[:]); err != nil {
-		panic(err)
-	}
+func newNonce() (nonce Nonce, err error) {
+	_, err = rand.Read(nonce[:])
 	return
 }
 
@@ -30,18 +27,11 @@ func randomString() string {
 	return base64.StdEncoding.EncodeToString(someBytes)
 }
 
-// 确保数据库文件不存在, 如果已存在则报错.
-func dbMustNotExist() {
-	if _, err := os.Stat(dbFullPath); !os.IsNotExist(err) {
-		panic("数据库文件已存在, 不可重复创建")
-	}
-}
-
-// 确保数据库文件已存在, 如果不存在则报错.
-func dbFileMustExist() {
+func dbFileIsNotExist() bool {
 	if _, err := os.Stat(dbFullPath); os.IsNotExist(err) {
-		panic("需要数据库文件, 但不存在")
+		return true
 	}
+	return false
 }
 
 // newNameByNow 返回当前时间戳的字符串.
@@ -66,43 +56,49 @@ func writeFragFile(sealed []byte) {
 }
 
 // 把数据写到指定位置.
-func writeFile(fullpath string, sealed []byte) {
-	if err := ioutil.WriteFile(fullpath, sealed, 0644); err != nil {
-		panic(err)
-	}
+func writeFile(fullpath string, sealed []byte) error {
+	return ioutil.WriteFile(fullpath, sealed, 0644)
 }
 
 // backupToTar 把数据库文件以及碎片文件备份到一个 tarball 里.
 // 主要在 Rebuild 之前使用, 以防万一 rebuild 出错.
 // 为了方便测试返回 tarball 的完整路径.
-func backupToTar() (filePath string) {
-	files := filesToBackup()
-	filePath = filepath.Join(dbDirPath, newBackupName())
-	if err := tarball.Create(filePath, files); err != nil {
-		panic(err)
+func backupToTar() (filePath string, err error) {
+	var files []string
+	files, err = filesToBackup()
+	if err != nil {
+		return
 	}
+	filePath = filepath.Join(dbDirPath, newBackupName())
+	err = tarball.Create(filePath, files)
 	return
 }
 
 // filesToBackup 返回需要备份的文件的完整路径.
-func filesToBackup() []string {
-	filePaths := fragFilePaths()
-	return append(filePaths, dbFullPath)
+func filesToBackup() ([]string, error) {
+	filePaths, err := fragFilePaths()
+	if err != nil {
+		return nil, err
+	}
+	return append(filePaths, dbFullPath), nil
 }
 
 // fragFilePaths 返回数据库碎片文件的完整路径, 并且已排序.
-func fragFilePaths() []string {
+func fragFilePaths() ([]string, error) {
 	pattern := filepath.Join(dbDirPath, "*"+FragExt)
 	filePaths, err := filepath.Glob(pattern)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	sort.Strings(filePaths)
-	return filePaths
+	return filePaths, nil
 }
 
-func readAndDecrypt(fullpath string, key SecretKey) (*Mima, bool) {
-	box := util.ReadFile(fullpath)
+func readAndDecrypt(fullpath string, key SecretKey) (*Mima, error) {
+	box, err := ioutil.ReadFile(fullpath)
+	if err != nil {
+		return nil, err
+	}
 	return DecryptToMima(box, key)
 }
 

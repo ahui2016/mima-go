@@ -17,43 +17,45 @@ import (
 )
 
 // 用于在测试之前删除数据库文件 (dbFullPath in temp_dir_for_test)
-func removeDB() {
+func removeDB() error {
 	if err := os.Remove(dbFullPath); err != nil && !os.IsNotExist(err) {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 func TestMakeFirstMima(t *testing.T) {
 	key := sha256.Sum256([]byte("我是密码"))
 	testDB := NewMimaDB(&key)
 
-	removeDB()
+	if err := removeDB(); err != nil {
+		t.Fatal(err)
+	}
 	testDB.MakeFirstMima()
 
 	// 检查内存中的 mima 是否正确
 	if testDB.Items.Len() != 1 {
-		t.Errorf("db.Items.Len() want: 1, got: %d", testDB.Items.Len())
+		t.Fatalf("db.Items.Len() want: 1, got: %d", testDB.Items.Len())
 	}
 	mima := testDB.GetByID(0) // 第一条数据的 id 固定为零
 	if mima == nil {
-		t.Error("want a mima, got nil")
+		t.Fatal("want a mima, got nil")
 	}
 	// t.Logf("len(mima.Notes) = %d", len(mima.Notes))
 	if mima.Title != "" || len(mima.Notes) != 340 {
-		t.Error("希望 Title 为空字符串, Notes 长度为 n, 但结果不是")
+		t.Fatal("希望 Title 为空字符串, Notes 长度为 n, 但结果不是")
 	}
 
 	// 检查数据库文件中的 mima 是否正确
 	if _, err := os.Stat(dbFullPath); os.IsNotExist(err) {
-		t.Errorf("数据库文件 %s 应存在, 但结果不存在", dbFullPath)
+		t.Fatalf("数据库文件 %s 应存在, 但结果不存在", dbFullPath)
 	}
-	解密后的数据, ok := readAndDecrypt(dbFullPath, &key)
-	if !ok {
-		t.Errorf("获取碎片内容失败: %s", dbFullPath)
-	} else {
-		if !约等于(解密后的数据, mima) {
-			t.Error("从数据库文件中恢复的 mima 与内存中的 mima 不一致")
-		}
+	解密后的数据, err := readAndDecrypt(dbFullPath, &key)
+	if err != nil {
+		t.Fatalf("%w: %s", err, dbFullPath)
+	}
+	if !约等于(解密后的数据, mima) {
+		t.Fatal("从数据库文件中恢复的 mima 与内存中的 mima 不一致")
 	}
 }
 
@@ -66,7 +68,9 @@ func TestAddMoreMimas(t *testing.T) {
 	}
 	key := sha256.Sum256([]byte("我是密码"))
 	testDB := NewMimaDB(&key)
-	removeDB()
+	if err := removeDB(); err != nil {
+		t.Fatal(err)
+	}
 	testDB.MakeFirstMima()
 
 	for _, mima := range want {
@@ -76,7 +80,10 @@ func TestAddMoreMimas(t *testing.T) {
 		testDB.Add(mima)
 	}
 
-	filePaths := fragFilePaths()
+	filePaths, err := fragFilePaths()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// TestFragFilePaths 测试所获取的数据库碎片文件路径是否升序排列.
 	t.Run("TestFragFilePaths", func(t *testing.T) {
 		for i := 0; i < len(filePaths)-1; i++ {
@@ -85,20 +92,22 @@ func TestAddMoreMimas(t *testing.T) {
 			}
 		}
 	})
+	if t.Failed() {
+		t.FailNow()
+	}
 
 	var got []*Mima
 	for _, f := range filePaths {
-		mima, ok := readAndDecrypt(f, &key)
-		if !ok {
-			t.Errorf("获取碎片内容失败: %s", f)
-		} else {
-			got = append(got, mima)
+		mima, err := readAndDecrypt(f, &key)
+		if err != nil {
+			t.Fatalf("%w: %s", err, f)
 		}
+		got = append(got, mima)
 	}
 
 	for i := 0; i < len(want); i++ {
 		if !约等于(want[i], got[i]) {
-			t.Error("从数据库碎片文件中恢复的 mima 与内存中的 mima 不一致")
+			t.Fatal("从数据库碎片文件中恢复的 mima 与内存中的 mima 不一致")
 		}
 	}
 
@@ -109,14 +118,26 @@ func TestAddMoreMimas(t *testing.T) {
 			sumOfOrigins [][]byte // 原始文件的 checksum
 			sumOfBackups [][]byte // 备份文件的 checksum
 		)
-		tarFilePath := backupToTar()
-		tarballReader := tarball.NewReader(tarFilePath)
-		sumOfBackups = tarballReader.Sha512()
+		tarFilePath, err := backupToTar()
+		if err != nil {
+			t.Fatal(err)
+		}
+		tarballReader, err := tarball.NewReader(tarFilePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sumOfBackups, err = tarballReader.Sha512()
+		if err != nil {
+			t.Fatal(err)
+		}
 		if err := tarballReader.Close(); err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 
-		files := filesToBackup()
+		files, err := filesToBackup()
+		if err != nil {
+			t.Fatal(err)
+		}
 		sumOfOrigins = getChecksums(files)
 
 		for i := 0; i < len(sumOfOrigins); i++ {
@@ -141,7 +162,10 @@ func getChecksums(files []string) (checksums [][]byte) {
 }
 
 func newRandomMima(title string) *Mima {
-	mima := NewMima(title)
+	mima, err := NewMima(title)
+	if err != nil {
+		panic(err)
+	}
 	mima.Username = randomString()
 	mima.Password = randomString()
 	mima.Notes = randomString()

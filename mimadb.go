@@ -3,8 +3,8 @@ package main
 import (
 	"bufio"
 	"container/list"
+	"errors"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 
@@ -36,48 +36,62 @@ func NewMimaDB(key SecretKey) *MimaDB {
 	return items
 }
 
-// Rebuild 读取数据库碎片, 整合到数据库文件中.
-// 每次启动程序, 初始化时, 自动执行一次 Rebuild.
-func (db *MimaDB) Rebuild() bool {
-	db.mustBeEmpty()
-	dbFileMustExist()
-	backupToTar()
-	db.scanDBtoMemory()
-	if ok := db.readFragFilesAndUpdate(); !ok {
-		return false
+// Rebuild 填充内存数据库，读取数据库碎片, 整合到数据库文件中.
+// 每次启动程序, 初始化时, 如果已有账号, 自动执行一次 Rebuild.
+func (db *MimaDB) Rebuild() error {
+	if !db.isEmpty() {
+		return errors.New("初始化失败: 内存中的数据库已有数据")
 	}
-	if ok := db.rewriteDBFile(); !ok {
-		return false
+	if dbFileIsNotExist() {
+		return dbFileNotFound
+	}
+	if _, err := backupToTar(); err != nil {
+		return err
+	}
+	if err := db.scanDBtoMemory(); err != nil {
+		return err
+	}
+	if err := db.readFragFilesAndUpdate(); err != nil {
+		return err
+	}
+	if err := db.rewriteDBFile(); err != nil {
+		return err
 	}
 
 	// 删除碎片
+	return nil
 }
 
 // scanDBtoMemory 读取 dbFullPath, 填充 MimaDB.
-func (db *MimaDB) scanDBtoMemory() {
+func (db *MimaDB) scanDBtoMemory() error {
 	scanner := util.NewFileScanner(dbFullPath)
 	for scanner.Scan() {
 		box := scanner.Bytes()
-		mima, ok := DecryptToMima(box, db.key)
-		if !ok {
-			log.Fatal("在初始化阶段解密失败")
+		mima, err := DecryptToMima(box, db.key)
+		if err != nil {
+			return fmt.Errorf("在初始化阶段解密失败: %w", err)
 		}
 		mima.ID = db.CurrentID
 		db.CurrentID++
 		db.Items.PushBack(mima)
 	}
 	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
+		return err
 	}
+	return nil
 }
 
 // readFragFilesAndUpdate 读取数据库碎片文件, 并根据其内容更新内存数据库.
 // 分为 新增, 更新, 软删除, 彻底删除 四种情形.
-func (db *MimaDB) readFragFilesAndUpdate() bool {
-	for _, f := range fragFilePaths() {
-		mima, ok := readAndDecrypt(f, db.key)
-		if !ok {
-			return false
+func (db *MimaDB) readFragFilesAndUpdate() error {
+	filePaths, err := fragFilePaths()
+	if err != nil {
+		return err
+	}
+	for _, f := range filePaths {
+		mima, err := readAndDecrypt(f, db.key)
+		if err != nil {
+			return err
 		}
 		if mima.UpdatedAt == mima.CreatedAt {
 			// 新增
@@ -87,8 +101,7 @@ func (db *MimaDB) readFragFilesAndUpdate() bool {
 
 		item := db.GetByID(mima.ID)
 		if item == nil {
-			log.Printf("NotFound: 找不到 id: %d 的条目", mima.ID)
-			return false
+			return fmt.Errorf("NotFound: 找不到 id: %d 的条目", mima.ID)
 		}
 
 		if mima.UpdatedAt > mima.CreatedAt {
@@ -104,20 +117,18 @@ func (db *MimaDB) readFragFilesAndUpdate() bool {
 		if mima.UpdatedAt == 0 {
 			// 彻底删除
 			if err := db.DeleteByID(mima.ID); err != nil {
-				log.Println(err)
-				return false
+				return err
 			}
 		}
 	}
-	return true
+	return nil
 }
 
 // rewriteDBFile 覆盖重写数据库文件, 将其更新为当前内存数据库的内容.
-func (db *MimaDB) rewriteDBFile() bool {
+func (db *MimaDB) rewriteDBFile() error {
 	dbFile, err := os.Create(dbFullPath)
 	if err != nil {
-		log.Println(err)
-		return false
+		return err
 	}
 	defer dbFile.Close()
 
@@ -126,27 +137,31 @@ func (db *MimaDB) rewriteDBFile() bool {
 		mima := e.Value.(*Mima)
 		sealed := mima.Seal(db.key)
 		if err := bufWriteln(dbWriter, sealed); err != nil {
-			log.Println(err)
-			return false
+			return err
 		}
 	}
 	if err := dbWriter.Flush(); err != nil {
-		log.Println(err)
-		return false
+		return err
 	}
-	return true
+	return nil
 }
 
 // MakeFirstMima 生成第一条记录, 用于保存密码.
 // 同时会生成数据库文件 mimadb/mima.db
-func (db *MimaDB) MakeFirstMima() {
-	dbMustNotExist()
-	mima := NewMima("")
+func (db *MimaDB) MakeFirstMima() error {
+	if !dbFileIsNotExist() {
+		return errors.New("数据库文件已存在, 不可重复创建")
+	}
+	mima, err := NewMima("")
+	if err != nil {
+		return err
+	}
 	// mima.ID = 0 默认为零
 	mima.Notes = randomString()
 	db.Add(mima)
 	sealed := mima.Seal(db.key)
 	writeFile(dbFullPath, sealed)
+	return nil
 }
 
 // GetByID 凭 id 找 mima, 如果找不到就返回 nil.
@@ -200,10 +215,11 @@ func (db *MimaDB) DeleteByID(id int) error {
 
 // mustBeEmpty 确认内存中的数据库必须为空.
 // 通常当不为空时不可进行初始化.
-func (db *MimaDB) mustBeEmpty() {
-	if db.Items.Len() != 0 {
-		panic("初始化失败: 内存中的数据库已有数据")
+func (db *MimaDB) isEmpty() bool {
+	if db.Items.Len() == 0 {
+		return true
 	}
+	return false
 }
 
 // InsertByUpdatedAt 把 mima 插入到适当的位置, 使链表保持有序.
