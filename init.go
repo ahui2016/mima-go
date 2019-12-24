@@ -46,7 +46,7 @@ func init() {
 func getBaseDir() string {
 	path, err := os.Executable()
 	if err != nil {
-		panic(err)
+		panic(err) // 因为是在初始化阶段, 允许程序崩溃.
 	}
 	path, _ = filepath.EvalSymlinks(path)
 	return filepath.Dir(path)

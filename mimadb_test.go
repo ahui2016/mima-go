@@ -52,7 +52,7 @@ func TestMakeFirstMima(t *testing.T) {
 	}
 	解密后的数据, err := readAndDecrypt(dbFullPath, &key)
 	if err != nil {
-		t.Fatalf("%w: %s", err, dbFullPath)
+		t.Fatalf("%v: %s", err, dbFullPath)
 	}
 	if !约等于(解密后的数据, mima) {
 		t.Fatal("从数据库文件中恢复的 mima 与内存中的 mima 不一致")
@@ -71,7 +71,9 @@ func TestAddMoreMimas(t *testing.T) {
 	if err := removeDB(); err != nil {
 		t.Fatal(err)
 	}
-	testDB.MakeFirstMima()
+	if err := testDB.MakeFirstMima(); err != nil {
+		t.Fatal(err)
+	}
 
 	for _, mima := range want {
 		// 由于数据是按更新时间排序的, 为了使其有明显顺序, 因此明显地设置其更新时间.
@@ -100,7 +102,7 @@ func TestAddMoreMimas(t *testing.T) {
 	for _, f := range filePaths {
 		mima, err := readAndDecrypt(f, &key)
 		if err != nil {
-			t.Fatalf("%w: %s", err, f)
+			t.Fatalf("%v: %s", err, f)
 		}
 		got = append(got, mima)
 	}
@@ -138,8 +140,10 @@ func TestAddMoreMimas(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sumOfOrigins = getChecksums(files)
-
+		sumOfOrigins, err = getChecksums(files)
+		if err != nil {
+			t.Fatal(err)
+		}
 		for i := 0; i < len(sumOfOrigins); i++ {
 			if !bytes.Equal(sumOfOrigins[i], sumOfBackups[i]) {
 				t.Errorf("第 %d 个文件的备份与原文件的 checksum 不一致", i+1)
@@ -149,11 +153,11 @@ func TestAddMoreMimas(t *testing.T) {
 }
 
 // getChecksums 返回 files(完整路径) 的 SHA512 checksum.
-func getChecksums(files []string) (checksums [][]byte) {
+func getChecksums(files []string) (checksums [][]byte, err error) {
 	for _, file := range files {
 		content, err := ioutil.ReadFile(file)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		sum := sha512.Sum512(content)
 		checksums = append(checksums, sum[:])
@@ -164,6 +168,8 @@ func getChecksums(files []string) (checksums [][]byte) {
 func newRandomMima(title string) *Mima {
 	mima, err := NewMima(title)
 	if err != nil {
+		// 为了 newRandomMima 的方便使用, 而且这是在单元测试里,
+		// 而且出错可能性也极小, 因此偷懒不返回错误信息.
 		panic(err)
 	}
 	mima.Username = randomString()

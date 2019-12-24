@@ -108,17 +108,13 @@ func (mima *Mima) Delete() {
 }
 
 // Seal 先把 mima 转换为 json, 再加密并返回二进制数据.
-func (mima *Mima) Seal(key SecretKey) []byte {
-	return secretbox.Seal(mima.Nonce[:], mima.toJSON(), &mima.Nonce, key)
-}
-
-// toJSON 把 mima 转换为 json 二进制数据.
-func (mima *Mima) toJSON() []byte {
-	blob, err := json.Marshal(mima)
+func (mima *Mima) Seal(key SecretKey) ([]byte, error) {
+	mimaJSON, err := json.Marshal(mima)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return blob
+	box := secretbox.Seal(mima.Nonce[:], mimaJSON, &mima.Nonce, key)
+	return box, nil
 }
 
 // History 用来保存修改历史.

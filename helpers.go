@@ -22,7 +22,7 @@ func newNonce() (nonce Nonce, err error) {
 func randomString() string {
 	someBytes := make([]byte, 255)
 	if _, err := rand.Read(someBytes); err != nil {
-		panic(err)
+		panic(err) // 因为这里有错误的可能性极小, 因此偷懒不处理.
 	}
 	return base64.StdEncoding.EncodeToString(someBytes)
 }

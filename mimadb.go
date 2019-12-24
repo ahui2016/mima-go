@@ -28,6 +28,8 @@ type MimaDB struct {
 // NewMimaDB 生成一个新的 MimaDB, 并对其中的 Items 进行初始化.
 func NewMimaDB(key SecretKey) *MimaDB {
 	if key == nil {
+		// 因为改错误属于 "编程时" 错误, 不是 "运行时" 错误, 可在运行前处理,
+		// 因此不返回错误信息, 而是让程序直接崩溃.
 		panic("缺少key, 需要key")
 	}
 	items := new(MimaDB)
@@ -64,7 +66,10 @@ func (db *MimaDB) Rebuild() error {
 
 // scanDBtoMemory 读取 dbFullPath, 填充 MimaDB.
 func (db *MimaDB) scanDBtoMemory() error {
-	scanner := util.NewFileScanner(dbFullPath)
+	scanner, err := util.NewFileScanner(dbFullPath)
+	if err != nil {
+		return err
+	}
 	for scanner.Scan() {
 		box := scanner.Bytes()
 		mima, err := DecryptToMima(box, db.key)
@@ -135,7 +140,10 @@ func (db *MimaDB) rewriteDBFile() error {
 	dbWriter := bufio.NewWriter(dbFile)
 	for e := db.Items.Front(); e != nil; e = e.Next() {
 		mima := e.Value.(*Mima)
-		sealed := mima.Seal(db.key)
+		sealed, err := mima.Seal(db.key)
+		if err != nil {
+			return err
+		}
 		if err := bufWriteln(dbWriter, sealed); err != nil {
 			return err
 		}
@@ -159,7 +167,10 @@ func (db *MimaDB) MakeFirstMima() error {
 	// mima.ID = 0 默认为零
 	mima.Notes = randomString()
 	db.Add(mima)
-	sealed := mima.Seal(db.key)
+	sealed, err := mima.Seal(db.key)
+	if err != nil {
+		return err
+	}
 	writeFile(dbFullPath, sealed)
 	return nil
 }
@@ -184,23 +195,27 @@ func (db *MimaDB) getElementByID(id int) *list.Element {
 }
 
 // Add 新增一个 mima 到数据库中, 并生成一块数据库碎片.
-func (db *MimaDB) Add(mima *Mima) {
+func (db *MimaDB) Add(mima *Mima) error {
 	if db.Items.Len() == 0 {
 		// 第一条记录特殊处理,
 		// 尤其注意从数据库文件读取数据到内存时, 确保第一条读入的是那条特殊记录.
 		db.Items.PushFront(mima)
 		db.CurrentID++
-		return
+		return nil
 	}
 	if len(mima.Title) == 0 {
-		panic("Title 标题长度必须大于零")
+		return errors.New("Title 标题长度必须大于零")
 	}
 	mima.ID = db.CurrentID
 	db.CurrentID++
 	db.insertByUpdatedAt(mima)
 
-	sealed := mima.Seal(db.key)
+	sealed, err := mima.Seal(db.key)
+	if err != nil {
+		return err
+	}
 	writeFragFile(sealed)
+	return nil
 }
 
 // DeleteByID 删除内存数据库中的指定条目.
