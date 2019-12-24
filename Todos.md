@@ -1,6 +1,6 @@
 # Todos
 
-- 错误处理改用 log
+- 写文件要用 base64, 因为如果用二进制, 会与换行符冲突.
 
 ## Write to file
 

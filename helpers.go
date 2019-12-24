@@ -50,37 +50,28 @@ func newBackupName() string {
 }
 
 // 把已加密的数据写到一个新文件中 (即生成一个新的数据库碎片).
-func writeFragFile(sealed []byte) {
+func writeFragFile(box64 string) {
 	fragmentPath := filepath.Join(dbDirPath, newFragmentName())
-	writeFile(fragmentPath, sealed)
+	writeFile(fragmentPath, box64)
 }
 
 // 把数据写到指定位置.
-func writeFile(fullpath string, sealed []byte) error {
-	return ioutil.WriteFile(fullpath, sealed, 0644)
+func writeFile(fullpath string, box64 string) error {
+	return ioutil.WriteFile(fullpath, []byte(box64), 0644)
 }
 
 // backupToTar 把数据库文件以及碎片文件备份到一个 tarball 里.
 // 主要在 Rebuild 之前使用, 以防万一 rebuild 出错.
 // 为了方便测试返回 tarball 的完整路径.
-func backupToTar() (filePath string, err error) {
-	var files []string
-	files, err = filesToBackup()
-	if err != nil {
-		return
-	}
+func backupToTar(files []string) (filePath string, err error) {
 	filePath = filepath.Join(dbDirPath, newBackupName())
 	err = tarball.Create(filePath, files)
 	return
 }
 
 // filesToBackup 返回需要备份的文件的完整路径.
-func filesToBackup() ([]string, error) {
-	filePaths, err := fragFilePaths()
-	if err != nil {
-		return nil, err
-	}
-	return append(filePaths, dbFullPath), nil
+func filesToBackup(fragFiles []string) []string {
+	return append(fragFiles, dbFullPath)
 }
 
 // fragFilePaths 返回数据库碎片文件的完整路径, 并且已排序.
@@ -95,19 +86,18 @@ func fragFilePaths() ([]string, error) {
 }
 
 func readAndDecrypt(fullpath string, key SecretKey) (*Mima, error) {
-	box, err := ioutil.ReadFile(fullpath)
+	b, err := ioutil.ReadFile(fullpath)
 	if err != nil {
 		return nil, err
 	}
-	return DecryptToMima(box, key)
+	box64 := string(b)
+	return DecryptToMima(box64, key)
 }
 
 // writeln 主要用于把已加密的 box 逐行写入文件 (添加换行符).
-func bufWriteln(w *bufio.Writer, box []byte) error {
-	if _, err := w.Write(box); err != nil {
-		return err
-	}
-	if _, err := w.WriteString("\n"); err != nil {
+// 这里需要把二进制数据转换为 base64, 因为二进制数据会与换行符冲突.
+func bufWriteln(w *bufio.Writer, box64 string) error {
+	if _, err := w.WriteString(box64 + "\n"); err != nil {
 		return err
 	}
 	return nil

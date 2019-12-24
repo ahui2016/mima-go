@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"time"
@@ -73,7 +74,11 @@ func NewMima(title string) (*Mima, error) {
 
 // DecryptToMima 从已加密数据中解密出一个 Mima 来.
 // 用于从数据库文件中读取数据进内存数据库.
-func DecryptToMima(box []byte, key SecretKey) (*Mima, error) {
+func DecryptToMima(box64 string, key SecretKey) (*Mima, error) {
+	box, err := base64.StdEncoding.DecodeString(box64)
+	if err != nil {
+		return nil, err
+	}
 	if len(box) < NonceSize {
 		return nil, errors.New("it's not a secretbox")
 	}
@@ -107,14 +112,16 @@ func (mima *Mima) Delete() {
 	mima.DeletedAt = time.Now().UnixNano()
 }
 
-// Seal 先把 mima 转换为 json, 再加密并返回二进制数据.
-func (mima *Mima) Seal(key SecretKey) ([]byte, error) {
-	mimaJSON, err := json.Marshal(mima)
+// Seal 先把 mima 转换为 json, 再加密并返回 base64 字符串.
+func (mima *Mima) Seal(key SecretKey) (box64 string, err error) {
+	var mimaJSON []byte
+	mimaJSON, err = json.Marshal(mima)
 	if err != nil {
-		return nil, err
+		return
 	}
 	box := secretbox.Seal(mima.Nonce[:], mimaJSON, &mima.Nonce, key)
-	return box, nil
+	box64 = base64.StdEncoding.EncodeToString(box)
+	return
 }
 
 // History 用来保存修改历史.

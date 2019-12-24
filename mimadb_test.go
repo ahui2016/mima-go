@@ -6,9 +6,11 @@ package main
 
 import (
 	"bytes"
+	"container/list"
 	"crypto/sha256"
 	"crypto/sha512"
 	"io/ioutil"
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -16,7 +18,7 @@ import (
 	"github.com/ahui2016/mima-go/tarball"
 )
 
-// 用于在测试之前删除数据库文件 (dbFullPath in temp_dir_for_test)
+// 用于在测试之前删除旧的数据库文件 (dbFullPath in temp_dir_for_test)
 func removeDB() error {
 	if err := os.Remove(dbFullPath); err != nil && !os.IsNotExist(err) {
 		return err
@@ -31,7 +33,9 @@ func TestMakeFirstMima(t *testing.T) {
 	if err := removeDB(); err != nil {
 		t.Fatal(err)
 	}
-	testDB.MakeFirstMima()
+	if err := testDB.MakeFirstMima(); err != nil {
+		t.Fatal(err)
+	}
 
 	// 检查内存中的 mima 是否正确
 	if testDB.Items.Len() != 1 {
@@ -82,14 +86,14 @@ func TestAddMoreMimas(t *testing.T) {
 		testDB.Add(mima)
 	}
 
-	filePaths, err := fragFilePaths()
+	fragFiles, err := fragFilePaths()
 	if err != nil {
 		t.Fatal(err)
 	}
 	// TestFragFilePaths 测试所获取的数据库碎片文件路径是否升序排列.
 	t.Run("TestFragFilePaths", func(t *testing.T) {
-		for i := 0; i < len(filePaths)-1; i++ {
-			if filePaths[i] >= filePaths[i+1] {
+		for i := 0; i < len(fragFiles)-1; i++ {
+			if fragFiles[i] >= fragFiles[i+1] {
 				t.Errorf("第 %d 个大于或等于第 %d 个", i, i+1)
 			}
 		}
@@ -99,7 +103,7 @@ func TestAddMoreMimas(t *testing.T) {
 	}
 
 	var got []*Mima
-	for _, f := range filePaths {
+	for _, f := range fragFiles {
 		mima, err := readAndDecrypt(f, &key)
 		if err != nil {
 			t.Fatalf("%v: %s", err, f)
@@ -120,7 +124,8 @@ func TestAddMoreMimas(t *testing.T) {
 			sumOfOrigins [][]byte // 原始文件的 checksum
 			sumOfBackups [][]byte // 备份文件的 checksum
 		)
-		tarFilePath, err := backupToTar()
+		allBackupFiles := filesToBackup(fragFiles)
+		tarFilePath, err := backupToTar(allBackupFiles)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -135,12 +140,7 @@ func TestAddMoreMimas(t *testing.T) {
 		if err := tarballReader.Close(); err != nil {
 			t.Fatal(err)
 		}
-
-		files, err := filesToBackup()
-		if err != nil {
-			t.Fatal(err)
-		}
-		sumOfOrigins, err = getChecksums(files)
+		sumOfOrigins, err = getChecksums(allBackupFiles)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -150,6 +150,64 @@ func TestAddMoreMimas(t *testing.T) {
 			}
 		}
 	})
+
+	// 由于刚好需要用到这里 "母测试" 产生的文件, 因此在此添加 "子测试".
+	// 测试根据数据库文件和碎片文件重建内存数据库的功能.
+	t.Run("TestRebuild", func(t *testing.T) {
+		rebuiltDB := NewMimaDB(&key)
+		tarballFile, err := rebuiltDB.Rebuild()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(tarballFile); os.IsNotExist(err) {
+			t.Fatalf("找不到备份文件: %s", tarballFile)
+		}
+		if !mimaListEqual(testDB.Items, rebuiltDB.Items) {
+			t.Fatal("恢复的内存数据库与原数据库不一致")
+		}
+
+		// 重新读取数据库文件的内容.
+		restoredDB := NewMimaDB(&key)
+		if err := restoredDB.scanDBtoMemory(); err != nil {
+			t.Fatal(err)
+		}
+		if !mimaListEqual(testDB.Items, restoredDB.Items) {
+			t.Fatal("数据库文件的内容与原数据库不一致")
+		}
+
+		// 在 Rebuild 过程中会删除数据库碎片文件, 在这里检查是否已删除.
+		fragFiles, err := fragFilePaths()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fragFiles != nil {
+			t.Fatal("数据库碎片文件应不存在, 但存在.")
+		}
+	})
+}
+
+// mimaListEqual 判断两个元素类型为 *Mima 的 list 是否相等.
+func mimaListEqual(a, b *list.List) bool {
+	if a.Len() != b.Len() {
+		log.Println("两个 list 的长度不一致")
+		return false
+	}
+	for {
+		e1 := a.Front()
+		e2 := b.Front()
+		if e1 == nil {
+			break
+		}
+		m1 := e1.Value.(*Mima)
+		m2 := e2.Value.(*Mima)
+		if !约等于(m1, m2) {
+			log.Printf("%s 不等于 %s", m1.Title, m2.Title)
+			return false
+		}
+		e1.Next()
+		e2.Next()
+	}
+	return true
 }
 
 // getChecksums 返回 files(完整路径) 的 SHA512 checksum.

@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 
@@ -40,27 +41,46 @@ func NewMimaDB(key SecretKey) *MimaDB {
 
 // Rebuild 填充内存数据库，读取数据库碎片, 整合到数据库文件中.
 // 每次启动程序, 初始化时, 如果已有账号, 自动执行一次 Rebuild.
-func (db *MimaDB) Rebuild() error {
+// 为了方便测试返回 tarball 文件路径.
+func (db *MimaDB) Rebuild() (tarballFile string, err error) {
+	var (
+		fragFiles []string
+	)
 	if !db.isEmpty() {
-		return errors.New("初始化失败: 内存中的数据库已有数据")
+		return tarballFile, errors.New("初始化失败: 内存中的数据库已有数据")
 	}
 	if dbFileIsNotExist() {
-		return dbFileNotFound
+		return tarballFile, dbFileNotFound
 	}
-	if _, err := backupToTar(); err != nil {
-		return err
+	fragFiles, err = fragFilePaths()
+	if err != nil {
+		return
 	}
-	if err := db.scanDBtoMemory(); err != nil {
-		return err
+	if tarballFile, err = backupToTar(filesToBackup(fragFiles)); err != nil {
+		return
 	}
-	if err := db.readFragFilesAndUpdate(); err != nil {
-		return err
+	if err = db.scanDBtoMemory(); err != nil {
+		return
 	}
-	if err := db.rewriteDBFile(); err != nil {
-		return err
+	if err = db.readFragFilesAndUpdate(fragFiles); err != nil {
+		return
 	}
+	if err = db.rewriteDBFile(); err != nil {
+		return
+	}
+	if err = db.deleteFragFiles(fragFiles); err != nil {
+		return
+	}
+	return
+}
 
-	// 删除碎片
+func (db *MimaDB) deleteFragFiles(filePaths []string) error {
+	for _, f := range filePaths {
+		if err := os.Remove(f); err != nil {
+			return err
+		}
+		log.Printf("已删除 %s", f)
+	}
 	return nil
 }
 
@@ -71,8 +91,8 @@ func (db *MimaDB) scanDBtoMemory() error {
 		return err
 	}
 	for scanner.Scan() {
-		box := scanner.Bytes()
-		mima, err := DecryptToMima(box, db.key)
+		box64 := scanner.Text()
+		mima, err := DecryptToMima(box64, db.key)
 		if err != nil {
 			return fmt.Errorf("在初始化阶段解密失败: %w", err)
 		}
@@ -88,11 +108,7 @@ func (db *MimaDB) scanDBtoMemory() error {
 
 // readFragFilesAndUpdate 读取数据库碎片文件, 并根据其内容更新内存数据库.
 // 分为 新增, 更新, 软删除, 彻底删除 四种情形.
-func (db *MimaDB) readFragFilesAndUpdate() error {
-	filePaths, err := fragFilePaths()
-	if err != nil {
-		return err
-	}
+func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
 	for _, f := range filePaths {
 		mima, err := readAndDecrypt(f, db.key)
 		if err != nil {
@@ -140,11 +156,11 @@ func (db *MimaDB) rewriteDBFile() error {
 	dbWriter := bufio.NewWriter(dbFile)
 	for e := db.Items.Front(); e != nil; e = e.Next() {
 		mima := e.Value.(*Mima)
-		sealed, err := mima.Seal(db.key)
+		box64, err := mima.Seal(db.key)
 		if err != nil {
 			return err
 		}
-		if err := bufWriteln(dbWriter, sealed); err != nil {
+		if err := bufWriteln(dbWriter, box64); err != nil {
 			return err
 		}
 	}
@@ -167,11 +183,11 @@ func (db *MimaDB) MakeFirstMima() error {
 	// mima.ID = 0 默认为零
 	mima.Notes = randomString()
 	db.Add(mima)
-	sealed, err := mima.Seal(db.key)
+	box64, err := mima.Seal(db.key)
 	if err != nil {
 		return err
 	}
-	writeFile(dbFullPath, sealed)
+	writeFile(dbFullPath, box64)
 	return nil
 }
 
