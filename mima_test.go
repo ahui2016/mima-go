@@ -16,6 +16,9 @@ func TestSortMima(t *testing.T) {
 
 	key := sha256.Sum256([]byte("我是密码"))
 	db := NewMimaDB(&key)
+	db.Lock()
+	db.Unlock()
+
 	for _, hour := range hours {
 		mima := new(Mima)
 		mima.UpdatedAt = time.Date(2019, time.May, 1, hour, 0, 0, 0, time.UTC).UnixNano()

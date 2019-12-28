@@ -29,6 +29,8 @@ func removeDB() error {
 func TestMakeFirstMima(t *testing.T) {
 	key := sha256.Sum256([]byte("我是密码"))
 	testDB := NewMimaDB(&key)
+	testDB.Lock()
+	defer testDB.Unlock()
 
 	if err := removeDB(); err != nil {
 		t.Fatal(err)
@@ -64,26 +66,36 @@ func TestMakeFirstMima(t *testing.T) {
 }
 
 // 测试增加多条记录的情形
+// 需要小心处理 sync.RWMutex 的锁
 func TestAddMoreMimas(t *testing.T) {
-	want := []*Mima{
-		newRandomMima("鹅鹅鹅"),
-		newRandomMima("二二二"),
-		newRandomMima("六六六"),
-	}
 	key := sha256.Sum256([]byte("我是密码"))
 	testDB := NewMimaDB(&key)
+
 	if err := removeDB(); err != nil {
 		t.Fatal(err)
 	}
+
+	testDB.Lock()
 	if err := testDB.MakeFirstMima(); err != nil {
 		t.Fatal(err)
 	}
+	testDB.Unlock()
 
-	for _, mima := range want {
-		// 由于数据是按更新时间排序的, 为了使其有明显顺序, 因此明显地设置其更新时间.
-		time.Sleep(100 * time.Millisecond)
-		mima.UpdatedAt = time.Now().UnixNano()
+	titles := []string{"鹅鹅鹅", "二二二", "六六六"}
+	want := make([]*Mima, len(titles))
+	for i, title := range titles {
+		mima, err := newRandomMima(title)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want[i] = mima
+
+		testDB.Lock()
 		testDB.Add(mima)
+		testDB.Unlock()
+
+		// 由于数据是按更新时间排序的, 为了使其有明显顺序, 因此明显地使其具有时间间隔.
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	fragFiles, err := fragFilePaths()
@@ -94,13 +106,10 @@ func TestAddMoreMimas(t *testing.T) {
 	t.Run("TestFragFilePaths", func(t *testing.T) {
 		for i := 0; i < len(fragFiles)-1; i++ {
 			if fragFiles[i] >= fragFiles[i+1] {
-				t.Errorf("第 %d 个大于或等于第 %d 个", i, i+1)
+				t.Fatalf("第 %d 个大于或等于第 %d 个", i+1, i+2)
 			}
 		}
 	})
-	if t.Failed() {
-		t.FailNow()
-	}
 
 	var got []*Mima
 	for _, f := range fragFiles {
@@ -116,6 +125,22 @@ func TestAddMoreMimas(t *testing.T) {
 			t.Fatal("从数据库碎片文件中恢复的 mima 与内存中的 mima 不一致")
 		}
 	}
+
+	// TestOrderOfDB 确认内存数据库中的条目按升序排列 (老数据在前, 新数据在后).
+	t.Run("TestOrderOfDB", func(t *testing.T) {
+		testDB.RLock()
+		mimaSlice := testDB.ToSlice()
+		testDB.RUnlock()
+
+		for i := 0; i < len(mimaSlice)-1; i++ {
+			a := mimaSlice[i]
+			b := mimaSlice[i+1]
+			if a.UpdatedAt >= b.UpdatedAt {
+				t.Logf("id: %d, Title: %s, id: %d, Title: %s", a.ID, a.Title, b.ID, b.Title)
+				t.Fatalf("第 %d 个元素的更新日期大于或等于第 %d 个", i+1, i+2)
+			}
+		}
+	})
 
 	// 由于刚好需要用到这里 "母测试" 产生的文件, 因此在此添加 "子测试".
 	// 测试备份是否成功 (检查备份文件 tarball 的内容).
@@ -153,29 +178,40 @@ func TestAddMoreMimas(t *testing.T) {
 
 	// 由于刚好需要用到这里 "母测试" 产生的文件, 因此在此添加 "子测试".
 	// 测试根据数据库文件和碎片文件重建内存数据库的功能.
-	t.Run("TestRebuild", func(t *testing.T) {
-		rebuiltDB := NewMimaDB(&key)
-		tarballFile, err := rebuiltDB.Rebuild()
-		if err != nil {
+	var (
+		tarballFile string
+		rebuiltDB   *MimaDB
+	)
+
+	t.Run("TestGetRebuiltDB", func(t *testing.T) {
+		var err error
+		rebuiltDB = NewMimaDB(&key)
+
+		rebuiltDB.Lock()
+		if tarballFile, err = rebuiltDB.Rebuild(); err != nil {
 			t.Fatal(err)
 		}
+		rebuiltDB.Unlock()
+	})
+
+	t.Run("TestTarballExist", func(t *testing.T) {
 		if _, err := os.Stat(tarballFile); os.IsNotExist(err) {
 			t.Fatalf("找不到备份文件: %s", tarballFile)
 		}
+	})
+
+	testDB.RLock()
+	rebuiltDB.RLock()
+	t.Run("TestEqualToTestDB", func(t *testing.T) {
 		if !mimaListEqual(testDB.Items, rebuiltDB.Items) {
 			t.Fatal("恢复的内存数据库与原数据库不一致")
 		}
+	})
+	rebuiltDB.RUnlock()
+	testDB.RUnlock()
 
-		// 重新读取数据库文件的内容.
-		restoredDB := NewMimaDB(&key)
-		if err := restoredDB.scanDBtoMemory(); err != nil {
-			t.Fatal(err)
-		}
-		if !mimaListEqual(testDB.Items, restoredDB.Items) {
-			t.Fatal("数据库文件的内容与原数据库不一致")
-		}
-
-		// 在 Rebuild 过程中会删除数据库碎片文件, 在这里检查是否已删除.
+	// 在 Rebuild 过程中会删除数据库碎片文件, 在这里检查是否已删除.
+	t.Run("TestFragFileShouldNotExist", func(t *testing.T) {
 		fragFiles, err := fragFilePaths()
 		if err != nil {
 			t.Fatal(err)
@@ -183,6 +219,25 @@ func TestAddMoreMimas(t *testing.T) {
 		if fragFiles != nil {
 			t.Fatal("数据库碎片文件应不存在, 但存在.")
 		}
+	})
+
+	// 由于数据库文件已被重写, 因此重新读取数据库文件的内容, 验证其正确性.
+	t.Run("TestScanDBtoMemory", func(t *testing.T) {
+		restoredDB := NewMimaDB(&key)
+
+		restoredDB.Lock()
+		if err := restoredDB.scanDBtoMemory(); err != nil {
+			t.Fatal(err)
+		}
+		restoredDB.Unlock()
+
+		testDB.RLock()
+		restoredDB.RLock()
+		if !mimaListEqual(testDB.Items, restoredDB.Items) {
+			t.Fatal("数据库文件的内容与原数据库不一致")
+		}
+		restoredDB.RUnlock()
+		testDB.RUnlock()
 	})
 }
 
@@ -192,9 +247,9 @@ func mimaListEqual(a, b *list.List) bool {
 		log.Println("两个 list 的长度不一致")
 		return false
 	}
+	e1 := a.Front()
+	e2 := b.Front()
 	for {
-		e1 := a.Front()
-		e2 := b.Front()
 		if e1 == nil {
 			break
 		}
@@ -204,8 +259,8 @@ func mimaListEqual(a, b *list.List) bool {
 			log.Printf("%s 不等于 %s", m1.Title, m2.Title)
 			return false
 		}
-		e1.Next()
-		e2.Next()
+		e1 = e1.Next()
+		e2 = e2.Next()
 	}
 	return true
 }
@@ -223,17 +278,15 @@ func getChecksums(files []string) (checksums [][]byte, err error) {
 	return
 }
 
-func newRandomMima(title string) *Mima {
+func newRandomMima(title string) (*Mima, error) {
 	mima, err := NewMima(title)
 	if err != nil {
-		// 为了 newRandomMima 的方便使用, 而且这是在单元测试里,
-		// 而且出错可能性也极小, 因此偷懒不返回错误信息.
-		panic(err)
+		return nil, err
 	}
 	mima.Username = randomString()
 	mima.Password = randomString()
 	mima.Notes = randomString()
-	return mima
+	return mima, nil
 }
 
 func 约等于(mima, other *Mima) bool {

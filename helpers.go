@@ -50,9 +50,9 @@ func newBackupName() string {
 }
 
 // 把已加密的数据写到一个新文件中 (即生成一个新的数据库碎片).
-func writeFragFile(box64 string) {
+func writeFragFile(box64 string) error {
 	fragmentPath := filepath.Join(dbDirPath, newFragmentName())
-	writeFile(fragmentPath, box64)
+	return writeFile(fragmentPath, box64)
 }
 
 // 把数据写到指定位置.

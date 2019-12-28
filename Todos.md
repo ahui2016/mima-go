@@ -1,6 +1,7 @@
 # Todos
 
-- 写文件要用 base64, 因为如果用二进制, 会与换行符冲突.
+- sync锁
+- 文件关闭
 
 ## Write to file
 

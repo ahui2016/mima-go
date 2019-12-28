@@ -17,10 +17,10 @@ func WrapErrors(allErrors ...error) (wrapped error) {
 }
 
 // NewFileScanner 打开指定文件并返回一个 Scanner, 以准备开始逐行读取文件内容.
-func NewFileScanner(fullpath string) (*bufio.Scanner, error) {
+func NewFileScanner(fullpath string) (*bufio.Scanner, *os.File, error) {
 	file, err := os.Open(fullpath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return bufio.NewScanner(file), nil
+	return bufio.NewScanner(file), file, nil
 }

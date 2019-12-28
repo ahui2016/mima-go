@@ -52,8 +52,7 @@ func (db *MimaDB) Rebuild() (tarballFile string, err error) {
 	if dbFileIsNotExist() {
 		return tarballFile, dbFileNotFound
 	}
-	fragFiles, err = fragFilePaths()
-	if err != nil {
+	if fragFiles, err = fragFilePaths(); err != nil {
 		return
 	}
 	if tarballFile, err = backupToTar(filesToBackup(fragFiles)); err != nil {
@@ -68,8 +67,15 @@ func (db *MimaDB) Rebuild() (tarballFile string, err error) {
 	if err = db.rewriteDBFile(); err != nil {
 		return
 	}
-	if err = db.deleteFragFiles(fragFiles); err != nil {
-		return
+	err = db.deleteFragFiles(fragFiles)
+	return
+}
+
+// ToSlice 把 list 转换为 slice, 保持其中元素的顺序.
+func (db *MimaDB) ToSlice() (mimaSlice []*Mima) {
+	for e := db.Items.Front(); e != nil; e = e.Next() {
+		mima := e.Value.(*Mima)
+		mimaSlice = append(mimaSlice, mima)
 	}
 	return
 }
@@ -86,10 +92,12 @@ func (db *MimaDB) deleteFragFiles(filePaths []string) error {
 
 // scanDBtoMemory 读取 dbFullPath, 填充 MimaDB.
 func (db *MimaDB) scanDBtoMemory() error {
-	scanner, err := util.NewFileScanner(dbFullPath)
+	scanner, file, err := util.NewFileScanner(dbFullPath)
 	if err != nil {
 		return err
 	}
+	defer file.Close()
+
 	for scanner.Scan() {
 		box64 := scanner.Text()
 		mima, err := DecryptToMima(box64, db.key)
@@ -187,8 +195,7 @@ func (db *MimaDB) MakeFirstMima() error {
 	if err != nil {
 		return err
 	}
-	writeFile(dbFullPath, box64)
-	return nil
+	return writeFile(dbFullPath, box64)
 }
 
 // GetByID 凭 id 找 mima, 如果找不到就返回 nil.
@@ -203,6 +210,7 @@ func (db *MimaDB) getElementByID(id int) *list.Element {
 	// 这里的算法效率不高, 当预估数据量较大时需要改用更高效率的算法.
 	for e := db.Items.Front(); e != nil; e = e.Next() {
 		mima := e.Value.(*Mima)
+		log.Printf("getElementByID, id: %d, Title: %s", mima.ID, mima.Title)
 		if mima.ID == id {
 			return e
 		}
@@ -230,8 +238,7 @@ func (db *MimaDB) Add(mima *Mima) error {
 	if err != nil {
 		return err
 	}
-	writeFragFile(sealed)
-	return nil
+	return writeFragFile(sealed)
 }
 
 // DeleteByID 删除内存数据库中的指定条目.
@@ -255,19 +262,19 @@ func (db *MimaDB) isEmpty() bool {
 
 // InsertByUpdatedAt 把 mima 插入到适当的位置, 使链表保持有序.
 func (db *MimaDB) insertByUpdatedAt(mima *Mima) {
-	if e := db.findUpdatedBefore(mima); e != nil {
-		db.Items.InsertBefore(mima, e)
+	if e := db.findUpdatedAfter(mima); e != nil {
+		db.Items.InsertAfter(mima, e)
 	} else {
 		db.Items.PushBack(mima)
 	}
 }
 
-// findUpdatedBefore 寻找一条记录, 其更新日期早于参数 mima 的更新日期.
-// 如果找不到则返回 nil, 表示参数 mima 的更新日期是最早的.
-func (db *MimaDB) findUpdatedBefore(mima *Mima) *list.Element {
+// findUpdatedAfter 寻找一条记录, 其更新日期大于(晚于)参数 mima 的更新日期.
+// 如果找不到则返回 nil, 表示参数 mima 的更新日期是最晚(最近)的.
+func (db *MimaDB) findUpdatedAfter(mima *Mima) *list.Element {
 	for e := db.Items.Front(); e != nil; e = e.Next() {
 		v := e.Value.(*Mima)
-		if v.UpdatedAt <= mima.UpdatedAt {
+		if v.UpdatedAt >= mima.UpdatedAt {
 			return e
 		}
 	}
