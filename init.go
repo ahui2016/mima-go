@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"html/template"
 	"os"
 	"path/filepath"
 )
@@ -11,9 +12,11 @@ const (
 	KeySize   = 32
 	NonceSize = 24
 
-	DBDir   = "mimadb"
-	DBName  = "mima.db"
-	TempDir = "temp_dir_for_test"
+	listenAddr = "127.0.0.1:80"
+	tmplDir    = "tmpl"
+	DBDir      = "mimadb"
+	DBName     = "mima.db"
+	TempDir    = "temp_dir_for_test"
 
 	// 数据库碎片文件的后缀名
 	FragExt = ".db.frag"
@@ -23,9 +26,11 @@ const (
 )
 
 var (
-	baseDir    string
-	dbDirPath  string
-	dbFullPath string
+	baseDir     string
+	dbDirPath   string
+	dbFullPath  string
+	tmplDirPath string
+	templates   *template.Template
 
 	dbFileNotFound error
 )
@@ -40,6 +45,10 @@ func init() {
 	baseDir = getBaseDir()
 	dbDirPath = filepath.Join(baseDir, DBDir)
 	dbFullPath = filepath.Join(dbDirPath, DBName)
+
+	tmplDirPath = filepath.Join(baseDir, tmplDir)
+	templates = template.Must(template.ParseGlob(filepath.Join(tmplDirPath, "*.html")))
+
 	dbFileNotFound = errors.New("找不到数据库文件")
 }
 

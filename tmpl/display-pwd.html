@@ -1,0 +1,31 @@
+{{define "display-pwd"}}
+<script type="text/javascript">
+function generatePW() {
+  var xhr = new XMLHttpRequest()
+  xhr.open('GET', '/mima/api/new-password')
+  xhr.onload = function() {
+    if (this.status === 200) {
+      document.getElementById('Password').value = this.responseText;
+      display_pwd();
+    }
+  }
+  xhr.onerror = function() {
+    window.alert('出错！获取数据失败。')
+  }
+  xhr.send()
+}
+
+function display_pwd() {
+  let pwd = document.getElementById('Password').value;
+  let pwd_html = "";
+  for (let n of pwd) {
+    if (isNaN(Number(n))) {
+      pwd_html += `<span style="color: blue;">${n}</span>`
+    } else {
+      pwd_html += `<span style="color: red;">${n}</span>`;
+    }
+  }
+  document.getElementById('pwd').innerHTML = pwd_html;
+}
+</script>
+{{end}}
