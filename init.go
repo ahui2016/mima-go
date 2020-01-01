@@ -32,6 +32,8 @@ var (
 	tmplDirPath string
 	templates   *template.Template
 
+	db *MimaDB
+
 	dbFileNotFound error
 )
 
