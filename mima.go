@@ -124,6 +124,19 @@ func (mima *Mima) Seal(key SecretKey) (box64 string, err error) {
 	return
 }
 
+func (mima *Mima) ToMimaForm() *MimaForm {
+	return &MimaForm{
+		ID:        mima.ID,
+		Title:     mima.Title,
+		Alias:     mima.Alias,
+		Username:  mima.Username,
+		Notes:     mima.Notes,
+		Favorite:  mima.Favorite,
+		CreatedAt: time.Unix(0, mima.CreatedAt).Format(dateAndTime),
+		UpdatedAt: time.Unix(0, mima.UpdatedAt).Format(dateAndTime),
+	}
+}
+
 // History 用来保存修改历史.
 // 全部内容均直接保留当时的 Mima 内容, 不作任何修改.
 type History struct {

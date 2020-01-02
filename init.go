@@ -12,11 +12,13 @@ const (
 	KeySize   = 32
 	NonceSize = 24
 
-	listenAddr = "127.0.0.1:80"
-	tmplDir    = "tmpl"
-	DBDir      = "mimadb"
-	DBName     = "mima.db"
-	TempDir    = "temp_dir_for_test"
+	listenAddr  = "127.0.0.1:80"
+	dateAndTime = "2006-01-02 15:04:05"
+
+	tmplDir = "tmpl"
+	DBDir   = "mimadb"
+	DBName  = "mima.db"
+	TempDir = "temp_dir_for_test"
 
 	// 数据库碎片文件的后缀名
 	FragExt = ".db.frag"

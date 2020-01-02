@@ -52,13 +52,17 @@ func (db *MimaDB) Rebuild() (tarballFile string, err error) {
 	if dbFileIsNotExist() {
 		return tarballFile, dbFileNotFound
 	}
+	if err = db.scanDBtoMemory(); err != nil {
+		return
+	}
 	if fragFiles, err = fragFilePaths(); err != nil {
 		return
 	}
-	if tarballFile, err = backupToTar(filesToBackup(fragFiles)); err != nil {
+	if len(fragFiles) == 0 {
+		// 如果没有数据库碎片文件, Rebuild 就相当于只执行 scanDBtoMemory.
 		return
 	}
-	if err = db.scanDBtoMemory(); err != nil {
+	if tarballFile, err = backupToTar(filesToBackup(fragFiles)); err != nil {
 		return
 	}
 	if err = db.readFragFilesAndUpdate(fragFiles); err != nil {
@@ -76,6 +80,21 @@ func (db *MimaDB) ToSlice() (mimaSlice []*Mima) {
 	for e := db.Items.Front(); e != nil; e = e.Next() {
 		mima := e.Value.(*Mima)
 		mimaSlice = append(mimaSlice, mima)
+	}
+	return
+}
+
+// All 返回全部 Mima, 但不包含 ID:0, 也不包含已软删除的条目.
+func (db *MimaDB) All() (all []*MimaForm) {
+	if db.Items.Len() < 2 {
+		return
+	}
+	e := db.Items.Front()
+	for e = e.Next(); e != nil; e = e.Next() {
+		mima := e.Value.(*Mima)
+		if mima.DeletedAt == 0 {
+			all = append(all, mima.ToMimaForm())
+		}
 	}
 	return
 }
@@ -210,7 +229,6 @@ func (db *MimaDB) getElementByID(id int) *list.Element {
 	// 这里的算法效率不高, 当预估数据量较大时需要改用更高效率的算法.
 	for e := db.Items.Front(); e != nil; e = e.Next() {
 		mima := e.Value.(*Mima)
-		log.Printf("getElementByID, id: %d, Title: %s", mima.ID, mima.Title)
 		if mima.ID == id {
 			return e
 		}
@@ -251,8 +269,6 @@ func (db *MimaDB) DeleteByID(id int) error {
 	return nil
 }
 
-// mustBeEmpty 确认内存中的数据库必须为空.
-// 通常当不为空时不可进行初始化.
 func (db *MimaDB) isEmpty() bool {
 	if db.Items.Len() == 0 {
 		return true

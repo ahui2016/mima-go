@@ -1,0 +1,21 @@
+{{define "login"}}
+{{template "top"}}
+<p>mima-go .. Login</p>
+
+<hr />
+
+{{if .Msg}}
+    <p>{{.Msg}}</p>
+{{end}}
+{{if .Err}}
+    <p style="font-weight: bold; color: red">Error: {{.Err}}</p>
+{{end}}
+
+<form action="/login" method="POST">
+    <label for="passowrd">Password:</label>
+        <input type="password" name="password" class="Fields" autofocus required/>
+    <input type="submit" value="Submit"/>
+</form>
+
+{{template "bottom"}}
+{{end}}
