@@ -1,0 +1,36 @@
+{{define "index"}}
+{{template "top"}}
+<p>mima-go .. All (<a href="/logout">logout</a>)</p>
+
+<hr />
+
+<p style="text-align:right">
+<a href="/search">Search</a>
+ . <a href="/add">Add</a>
+ . <a href="/recyclebin">Recycle Bin</a>
+</p>
+
+{{range .}}
+    <div class="Item">
+        <div class="Title">
+            {{if .Favorite}}<div class="Favorite">★</div>
+            {{else}}<div class="NotFav">・</div>{{end}}
+            {{.Title}}
+            <span class="ButtonsForTitle">
+                <a href="#">名</a>
+                <a href="#">密</a>
+                <a href="/edit?id={{.ID}}">改</a>
+                <a href="/delete?id={{.ID}}">删</a>
+            </span>
+        </div>
+        <div style="margin-left: 1.5em">
+            {{if .Username}}{{.Username}}{{end}}<br/>
+            {{if .Notes}}{{.Notes}}{{end}}
+        </div>
+    </div>
+{{else}}
+    <p>空空如也。</p>
+{{end}}
+
+{{template "bottom"}}
+{{end}}

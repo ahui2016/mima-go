@@ -15,20 +15,21 @@ type (
 )
 
 func main() {
-	http.HandleFunc("/create-account", createAccount)
-	http.HandleFunc("/login", loginHandler)
+	http.HandleFunc("/create-account", noCache(createAccount))
+	http.HandleFunc("/login", noCache(loginHandler))
+	http.HandleFunc("/logout", noCache(logoutHandler))
+	http.HandleFunc("/index/", noCache(checkState(indexHandler)))
 
 	fmt.Println(listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, nil))
 }
 
-func withPattern(pattern string, fn func(httpRW, httpReq, string)) httpHF {
-	return func(w httpRW, r httpReq) {
-		fn(w, r, pattern)
-	}
-}
-
 func createAccount(w httpRW, r httpReq) {
+	if !isLoggedOut() || !dbFileIsNotExist() {
+		err := &Feedback{Err: errors.New("已存在账号, 不可重复创建")}
+		checkErr(w, templates.ExecuteTemplate(w, "create-account", err))
+		return
+	}
 	if r.Method != http.MethodPost {
 		checkErr(w, templates.ExecuteTemplate(w, "create-account", nil))
 		return
@@ -48,18 +49,18 @@ func createAccount(w httpRW, r httpReq) {
 		return
 	}
 	logout()
-	msg := &Feedback{Msg: "成功创建新账号, 请登录"}
+	msg := &Feedback{Msg: "成功创建新账号, 请登入"}
 	checkErr(w, templates.ExecuteTemplate(w, "login", msg))
 }
 
 func loginHandler(w httpRW, r httpReq) {
-	if r.Method != http.MethodPost {
-		checkErr(w, templates.ExecuteTemplate(w, "login", nil))
-		return
-	}
 	if !isLoggedOut() {
 		err := &Feedback{Err: errors.New("已登入, 不可重复登入")}
 		checkErr(w, templates.ExecuteTemplate(w, "login", err))
+		return
+	}
+	if r.Method != http.MethodPost {
+		checkErr(w, templates.ExecuteTemplate(w, "login", nil))
 		return
 	}
 	password := r.FormValue("password")
@@ -72,7 +73,17 @@ func loginHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "login", &Feedback{Err: err}))
 		return
 	}
-	fmt.Fprintf(w, "%s", db.GetByID(0).Notes)
+	http.Redirect(w, r, "/index/", http.StatusFound)
+}
+
+func logoutHandler(w httpRW, r httpReq) {
+	logout()
+	msg := &Feedback{Msg: "已登出, 请重新登入"}
+	checkErr(w, templates.ExecuteTemplate(w, "login", msg))
+}
+
+func indexHandler(w httpRW, r httpReq) {
+	checkErr(w, templates.ExecuteTemplate(w, "index", db.All()))
 }
 
 func checkErr(w httpRW, err error) {

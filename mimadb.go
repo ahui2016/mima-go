@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/ahui2016/mima-go/util"
 )
@@ -23,7 +24,9 @@ type MimaDB struct {
 	// 原始数据, 按 UpdatedAt 排序.
 	Items *list.List
 
-	key SecretKey
+	key       SecretKey
+	StartedAt time.Time
+	Period    time.Duration
 }
 
 // NewMimaDB 生成一个新的 MimaDB, 并对其中的 Items 进行初始化.
@@ -33,10 +36,12 @@ func NewMimaDB(key SecretKey) *MimaDB {
 		// 因此不返回错误信息, 而是让程序直接崩溃.
 		panic("缺少key, 需要key")
 	}
-	items := new(MimaDB)
-	items.key = key
-	items.Items = list.New()
-	return items
+	return &MimaDB{
+		Items:     list.New(),
+		key:       key,
+		StartedAt: time.Now(),
+		Period:    time.Minute * 30,
+	}
 }
 
 // Rebuild 填充内存数据库，读取数据库碎片, 整合到数据库文件中.
@@ -84,19 +89,25 @@ func (db *MimaDB) ToSlice() (mimaSlice []*Mima) {
 	return
 }
 
-// All 返回全部 Mima, 但不包含 ID:0, 也不包含已软删除的条目.
-func (db *MimaDB) All() (all []*MimaForm) {
+// All 返回全部 Mima, 但不包含 ID:0, 也不包含已软删除的条目. 并且, Favorite 顶置.
+func (db *MimaDB) All() []*MimaForm {
 	if db.Items.Len() < 2 {
-		return
+		return nil
 	}
+	var favorites, notFav []*MimaForm
 	e := db.Items.Front()
 	for e = e.Next(); e != nil; e = e.Next() {
 		mima := e.Value.(*Mima)
-		if mima.DeletedAt == 0 {
-			all = append(all, mima.ToMimaForm())
+		if mima.DeletedAt > 0 {
+			continue
+		}
+		if mima.Favorite {
+			favorites = append(favorites, mima.ToMimaForm())
+		} else {
+			notFav = append(notFav, mima.ToMimaForm())
 		}
 	}
-	return
+	return append(favorites, notFav...)
 }
 
 func (db *MimaDB) deleteFragFiles(filePaths []string) error {
