@@ -89,22 +89,23 @@ func (db *MimaDB) ToSlice() (mimaSlice []*Mima) {
 	return
 }
 
-// All 返回全部 Mima, 但不包含 ID:0, 也不包含已软删除的条目. 并且, Favorite 顶置.
+// All 返回全部 Mima, 但不包含 ID:0, 也不包含已软删除的条目.
+// 并且, 不包含密码. 另外, 更新时间最新(最近)的排在前面, Favorite 顶置.
 func (db *MimaDB) All() []*MimaForm {
 	if db.Items.Len() < 2 {
 		return nil
 	}
 	var favorites, notFav []*MimaForm
-	e := db.Items.Front()
-	for e = e.Next(); e != nil; e = e.Next() {
+	for e := db.Items.Back(); e.Prev() != nil; e = e.Prev() {
 		mima := e.Value.(*Mima)
 		if mima.DeletedAt > 0 {
 			continue
 		}
+		form := mima.ToMimaForm().HidePassword()
 		if mima.Favorite {
-			favorites = append(favorites, mima.ToMimaForm())
+			favorites = append(favorites, form)
 		} else {
-			notFav = append(notFav, mima.ToMimaForm())
+			notFav = append(notFav, form)
 		}
 	}
 	return append(favorites, notFav...)

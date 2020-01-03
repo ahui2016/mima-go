@@ -11,7 +11,7 @@
     </p>
 {{end}}
 
-<form action="/add" method="POST" autocomplete="off">
+<form action="/add/" method="POST" autocomplete="off">
   <label for="Title">Title:</label>
     <input type="text" name="Title" id="Title" class="Fields" autofocus required
            onblur="this.value = this.value.trim()" />
@@ -30,16 +30,17 @@
   </p>
 </form>
 
+{{template "display-pwd"}}
+
 {{if .}}
 <script type="text/javascript">
 document.getElementById('Title').value = {{.Title}}
 document.getElementById('Username').value = {{.Username}}
 document.getElementById('Password').value = {{.Password}}
 document.getElementById('Notes').value = {{.Notes}}
+display_pwd()
 </script>
 {{end}}
-
-{{template "display-pwd"}}
 
 {{template "bottom"}}
 {{end}}

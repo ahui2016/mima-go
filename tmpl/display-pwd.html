@@ -2,7 +2,7 @@
 <script type="text/javascript">
 function generatePW() {
   var xhr = new XMLHttpRequest()
-  xhr.open('GET', '/mima/api/new-password')
+  xhr.open('GET', '/api/new-password')
   xhr.onload = function() {
     if (this.status === 200) {
       document.getElementById('Password').value = this.responseText;

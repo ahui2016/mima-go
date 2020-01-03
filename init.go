@@ -9,8 +9,9 @@ import (
 
 // 一些常量
 const (
-	KeySize   = 32
-	NonceSize = 24
+	KeySize      = 32
+	NonceSize    = 24
+	passwordSize = 16
 
 	listenAddr  = "127.0.0.1:80"
 	dateAndTime = "2006-01-02 15:04:05"

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
@@ -21,6 +23,7 @@ func main() {
 	http.HandleFunc("/logout", noCache(logoutHandler))
 	http.HandleFunc("/index/", noCache(checkState(indexHandler)))
 	http.HandleFunc("/add/", noCache(checkState(addHandler)))
+	http.HandleFunc("/api/new-password", newPassword)
 
 	fmt.Println(listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, nil))
@@ -93,9 +96,34 @@ func addHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "add", nil))
 		return
 	}
-	_ = MimaForm{
-		Title: strings.TrimSpace(r.FormValue("Title")),
+	form := MimaForm{
+		Title:    strings.TrimSpace(r.FormValue("Title")),
+		Username: strings.TrimSpace(r.FormValue("Username")),
+		Password: r.FormValue("Password"),
+		Notes:    strings.TrimSpace(r.FormValue("Notes")),
 	}
+	if form.Title == "" {
+		form.Err = errors.New("标题不可为空, 请填写标题")
+		checkErr(w, templates.ExecuteTemplate(w, "add", form))
+		return
+	}
+	mima, err := form.ToMima()
+	if err != nil {
+		form.Err = err
+		checkErr(w, templates.ExecuteTemplate(w, "add", form))
+		return
+	}
+	db.Add(mima)
+	http.Redirect(w, r, "/index/", http.StatusFound)
+}
+
+func newPassword(w httpRW, r httpReq) {
+	pwBytes := make([]byte, passwordSize)
+	if _, err := rand.Read(pwBytes); err != nil {
+		fmt.Fprint(w, err)
+	}
+	pw := base64.RawURLEncoding.EncodeToString(pwBytes)[:passwordSize]
+	fmt.Fprint(w, pw)
 }
 
 func checkErr(w httpRW, err error) {

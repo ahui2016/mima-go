@@ -124,12 +124,14 @@ func (mima *Mima) Seal(key SecretKey) (box64 string, err error) {
 	return
 }
 
+// ToMimaForm 把 Mima 转换为 MimaForm, 用于与前端网页交流.
 func (mima *Mima) ToMimaForm() *MimaForm {
 	return &MimaForm{
 		ID:        mima.ID,
 		Title:     mima.Title,
 		Alias:     mima.Alias,
 		Username:  mima.Username,
+		Password:  mima.Password,
 		Notes:     mima.Notes,
 		Favorite:  mima.Favorite,
 		CreatedAt: time.Unix(0, mima.CreatedAt).Format(dateAndTime),
