@@ -41,7 +41,7 @@ func checkState(fn httpHF) httpHF {
 
 func noCache(fn httpHF) httpHF {
 	return func(w httpRW, r httpReq) {
-		r.Header.Set(
+		w.Header().Set(
 			"Cache-Control",
 			"no-store, no-cache, must-revalidate",
 		)

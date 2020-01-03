@@ -18,6 +18,7 @@ type MimaForm struct {
 	Favorite  bool
 	CreatedAt string
 	UpdatedAt string
+	Err       error
 }
 
 // DeletedMimas 用来表示一个已删除的 Mima, 但只包含一部分信息.
@@ -28,4 +29,5 @@ type DeletedMimas struct {
 	Username  string
 	Notes     string
 	DeletedAt string
+	Err       error
 }

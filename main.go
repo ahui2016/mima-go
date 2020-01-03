@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type (
@@ -19,6 +20,7 @@ func main() {
 	http.HandleFunc("/login", noCache(loginHandler))
 	http.HandleFunc("/logout", noCache(logoutHandler))
 	http.HandleFunc("/index/", noCache(checkState(indexHandler)))
+	http.HandleFunc("/add/", noCache(checkState(addHandler)))
 
 	fmt.Println(listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, nil))
@@ -84,6 +86,16 @@ func logoutHandler(w httpRW, r httpReq) {
 
 func indexHandler(w httpRW, r httpReq) {
 	checkErr(w, templates.ExecuteTemplate(w, "index", db.All()))
+}
+
+func addHandler(w httpRW, r httpReq) {
+	if r.Method != http.MethodPost {
+		checkErr(w, templates.ExecuteTemplate(w, "add", nil))
+		return
+	}
+	_ = MimaForm{
+		Title: strings.TrimSpace(r.FormValue("Title")),
+	}
 }
 
 func checkErr(w httpRW, err error) {

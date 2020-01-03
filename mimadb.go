@@ -40,7 +40,7 @@ func NewMimaDB(key SecretKey) *MimaDB {
 		Items:     list.New(),
 		key:       key,
 		StartedAt: time.Now(),
-		Period:    time.Minute * 30,
+		Period:    time.Minute * 5,
 	}
 }
 

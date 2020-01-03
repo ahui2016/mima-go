@@ -1,0 +1,45 @@
+{{define "add"}}
+{{template "top"}}
+
+<p><a href="/index">mima-go</a> .. Add a new item</p>
+
+<hr />
+
+{{if .Err}}
+    <p style="font-weight: bold; color: red">
+    Error: {{.Err}}
+    </p>
+{{end}}
+
+<form action="/add" method="POST" autocomplete="off">
+  <label for="Title">Title:</label>
+    <input type="text" name="Title" id="Title" class="Fields" autofocus required
+           onblur="this.value = this.value.trim()" />
+  <label for="Username">Username:</label>
+    <input type="text" name="Username" id="Username" class="Fields"
+           onblur="this.value = this.value.trim()" />
+  <label for="Password">Password: (<a href="#" onclick="generatePW()">generate</a>)</label>
+    <input type="text" name="Password" id="Password" class="Fields"
+           style="font-family:Serif;" 
+           value="{{.Password}}" oninput="display_pwd()" />
+    <div id="pwd" style="font-size: larger;margin-left: 1.1em;"></div>
+  <label for="Notes">Notes:</label>
+    <textarea name="Notes" id="Notes" class="Fields"></textarea>
+  <p>
+    <input type="submit" value="Submit" />
+  </p>
+</form>
+
+{{if .}}
+<script type="text/javascript">
+document.getElementById('Title').value = {{.Title}}
+document.getElementById('Username').value = {{.Username}}
+document.getElementById('Password').value = {{.Password}}
+document.getElementById('Notes').value = {{.Notes}}
+</script>
+{{end}}
+
+{{template "display-pwd"}}
+
+{{template "bottom"}}
+{{end}}

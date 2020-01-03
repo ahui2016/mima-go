@@ -4,13 +4,15 @@
 
 <hr />
 
+<p style="text-align:right"><a href="/login">Login</a></p>
+
 <p>The <strong>mima.db</strong> file does not exist.</p>
 <p>Input a new password to create a new account.</p>
 
 {{if .Err}}
-<p style="font-weight: bold; color: red">
-Error: {{.Err}}
-</p>
+    <p style="font-weight: bold; color: red">
+    Error: {{.Err}}
+    </p>
 {{end}}
 
 <form action="/create-account" method="POST" autocomplete="off">
