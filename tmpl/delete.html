@@ -1,0 +1,35 @@
+{{define "delete"}}
+{{template "top"}}
+
+<p><a href="/home">mima-go</a> .. Delete</p>
+
+<hr />
+
+{{ if . }}
+    {{if .Err}}
+        <p style="font-weight: bold; color: red">
+        Error: {{.Err}}
+        </p>
+    {{else}}
+        <form action="/delete" method="POST">
+            <input type="hidden" name="ID" value="{{.ID}}" />
+            <p style="font-weight: bold; color: red">
+                Confirm: 扔进垃圾桶吗? (可恢复) <input type="submit" value="Yes" />
+            </p>
+        </form>
+        <p>
+            <strong>Title: {{.Title}}</strong><br />
+            {{if .Username}}Username: {{.Username}}<br />{{end}}
+            {{if .Password}}Password: {{.Password}}<br />{{end}}
+            {{if .Notes}}Notes: {{.Notes}}{{end}}
+        </p>
+    {{end}}
+
+{{ else }}
+    <p style="font-weight: bold; color: red">
+        Not Found: 找不到这条记录。
+    </p>
+{{end}}
+
+{{template "bottom"}}
+{{end}}

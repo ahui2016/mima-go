@@ -1,7 +1,7 @@
 # Todos
 
-- sync锁
-- 文件关闭
+- Rebuild 里漏了从软删除恢复的情况
+- 在 Mima 里增加一个 Operation 字段 (enum)
 
 ## Write to file
 

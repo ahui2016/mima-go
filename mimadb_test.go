@@ -202,7 +202,7 @@ func TestAddMoreMimas(t *testing.T) {
 
 	testDB.RLock()
 	rebuiltDB.RLock()
-	t.Run("TestEqualToTestDB", func(t *testing.T) {
+	t.Run("TestReBuiltDB", func(t *testing.T) {
 		if !mimaListEqual(testDB.Items, rebuiltDB.Items) {
 			t.Fatal("恢复的内存数据库与原数据库不一致")
 		}
@@ -222,7 +222,7 @@ func TestAddMoreMimas(t *testing.T) {
 	})
 
 	// 由于数据库文件已被重写, 因此重新读取数据库文件的内容, 验证其正确性.
-	t.Run("TestScanDBtoMemory", func(t *testing.T) {
+	t.Run("TestRewriteDBFile", func(t *testing.T) {
 		restoredDB := NewMimaDB(&key)
 
 		restoredDB.Lock()

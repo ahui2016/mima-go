@@ -30,29 +30,14 @@ type Mima struct {
 	// 因此平时可偷懒不检查其唯一性.
 	Nonce Nonce
 
-	// 用户名
-	Username string
-
-	// 密码
-	Password string
-
-	// 备注
-	Notes string
-
-	// 顶置
-	Favorite bool
-
-	// 创建时间
+	Username  string
+	Password  string
+	Notes     string
+	Favorite  bool
 	CreatedAt int64
-
-	// 当 UpdatedAt 等于 CreatedAt, 表示新增.
-	// 当 UpdatedAt 大于 CreatedAt, 表示更新.
-	// (注意 UpdatedAt 等于 原UpdatedAt 的情况, 可能表示软删除)
-	// 当 UpdatedAt 为零, 表示需要彻底删除.
 	UpdatedAt int64
-
-	// 当 DeletedAt 大于零, 表示需要软删除.
 	DeletedAt int64
+	Operation Operation
 
 	// 修改历史
 	HistoryItems []History
@@ -110,6 +95,11 @@ func (mima *Mima) Update(fragment *Mima) {
 // Delete 更新删除时间, 即软删除.
 func (mima *Mima) Delete() {
 	mima.DeletedAt = time.Now().UnixNano()
+}
+
+// Undelete 把删除时间重置为零.
+func (mima *Mima) Undelete() {
+	mima.DeletedAt = 0
 }
 
 // Seal 先把 mima 转换为 json, 再加密并返回 base64 字符串.

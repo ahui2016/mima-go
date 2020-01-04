@@ -19,6 +19,7 @@ type MimaForm struct {
 	Favorite  bool
 	CreatedAt string
 	UpdatedAt string
+	DeletedAt string
 	Err       error
 }
 
@@ -37,16 +38,4 @@ func (form *MimaForm) ToMima() (mima *Mima, err error) {
 	mima.Password = form.Password
 	mima.Notes = form.Notes
 	return
-}
-
-// DeletedMimas 用来表示一个已删除的 Mima, 但只包含一部分信息.
-type DeletedMimas struct {
-	ID        int
-	Title     string
-	Alias     string
-	Username  string
-	Password  string
-	Notes     string
-	DeletedAt string
-	Err       error
 }

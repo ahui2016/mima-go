@@ -5,12 +5,25 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
-	"log"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/ahui2016/mima-go/util"
+)
+
+// Operation 表示数据库的操作指令.
+// 由于本程序不使用真正的数据库, 而是自己弄一个简陋的数据库, 因此需要该类型辅助.
+type Operation int
+
+// 数据库操作的 enum (枚举)
+const (
+	Insert Operation = iota + 1
+	Update
+	SoftDelete
+	Undelete
+	DeleteForever
 )
 
 // MimaDB 相当于一个数据表.
@@ -111,12 +124,28 @@ func (db *MimaDB) All() []*MimaForm {
 	return append(favorites, notFav...)
 }
 
+// DeletedMimas 返回全部被软删除的 Mima, 不包含密码.
+// 删除日期最新(最近)的排在前面.
+func (db *MimaDB) DeletedMimas() (deleted []*MimaForm) {
+	for e := db.Items.Back(); e.Prev() != nil; e = e.Prev() {
+		mima := e.Value.(*Mima)
+		if mima.DeletedAt <= 0 {
+			continue
+		}
+		form := mima.ToMimaForm().HidePassword()
+		deleted = append(deleted, form)
+	}
+	sort.Slice(deleted, func(i, j int) bool {
+		return deleted[i].DeletedAt > deleted[j].DeletedAt
+	})
+	return
+}
+
 func (db *MimaDB) deleteFragFiles(filePaths []string) error {
 	for _, f := range filePaths {
 		if err := os.Remove(f); err != nil {
 			return err
 		}
-		log.Printf("已删除 %s", f)
 	}
 	return nil
 }
@@ -153,8 +182,7 @@ func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
 		if err != nil {
 			return err
 		}
-		if mima.UpdatedAt == mima.CreatedAt {
-			// 新增
+		if mima.Operation == Insert {
 			db.insertByUpdatedAt(mima)
 			continue
 		}
@@ -164,21 +192,19 @@ func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
 			return fmt.Errorf("NotFound: 找不到 id: %d 的条目", mima.ID)
 		}
 
-		if mima.UpdatedAt > mima.CreatedAt {
-			// 更新
+		switch mima.Operation {
+		case Insert: // 上面已操作, 这里不需要再操作.
+		case Update:
 			item.Update(mima)
-			continue
-		}
-		if mima.DeletedAt > 0 {
-			// 软删除
+		case SoftDelete:
 			item.Delete()
-			continue
-		}
-		if mima.UpdatedAt == 0 {
-			// 彻底删除
-			if err := db.DeleteByID(mima.ID); err != nil {
+		case Undelete:
+			item.Undelete()
+		case DeleteForever:
+			if _, err := db.deleteByID(item.ID); err != nil {
 				return err
 			}
+		default: // 一共 5 种 Operation 已在上面全部处理, 没有其他可能.
 		}
 	}
 	return nil
@@ -264,6 +290,11 @@ func (db *MimaDB) Add(mima *Mima) error {
 	db.CurrentID++
 	db.insertByUpdatedAt(mima)
 
+	mima.Operation = Insert
+	return db.sealAndWriteFrag(mima)
+}
+
+func (db *MimaDB) sealAndWriteFrag(mima *Mima) error {
 	sealed, err := mima.Seal(db.key)
 	if err != nil {
 		return err
@@ -271,14 +302,27 @@ func (db *MimaDB) Add(mima *Mima) error {
 	return writeFragFile(sealed)
 }
 
-// DeleteByID 删除内存数据库中的指定条目.
-func (db *MimaDB) DeleteByID(id int) error {
+// TrashByID 软删除一个 mima, 并生成一块数据库碎片.
+func (db *MimaDB) TrashByID(id int) error {
 	e := db.getElementByID(id)
 	if e == nil {
 		return fmt.Errorf("NotFound: 找不到 id: %d 的条目", id)
 	}
-	db.Items.Remove(e)
-	return nil
+	mima := e.Value.(*Mima)
+	mima.Delete()
+	mima.Operation = SoftDelete
+	return db.sealAndWriteFrag(mima)
+}
+
+// deleteByID 删除内存数据库中的指定条目.
+func (db *MimaDB) deleteByID(id int) (*Mima, error) {
+	e := db.getElementByID(id)
+	if e == nil {
+		return nil, fmt.Errorf("NotFound: 找不到 id: %d 的条目", id)
+	}
+	value := db.Items.Remove(e)
+	mima := value.(*Mima)
+	return mima, nil
 }
 
 func (db *MimaDB) isEmpty() bool {

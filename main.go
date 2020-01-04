@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -21,8 +22,10 @@ func main() {
 	http.HandleFunc("/create-account", noCache(createAccount))
 	http.HandleFunc("/login", noCache(loginHandler))
 	http.HandleFunc("/logout", noCache(logoutHandler))
+	http.HandleFunc("/home/", homeHandler)
 	http.HandleFunc("/index/", noCache(checkState(indexHandler)))
 	http.HandleFunc("/add/", noCache(checkState(addHandler)))
+	http.HandleFunc("/delete/", noCache(checkState(deleteHandler)))
 	http.HandleFunc("/api/new-password", newPassword)
 
 	fmt.Println(listenAddr)
@@ -78,13 +81,17 @@ func loginHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "login", &Feedback{Err: err}))
 		return
 	}
-	http.Redirect(w, r, "/index/", http.StatusFound)
+	http.Redirect(w, r, "/home/", http.StatusFound)
 }
 
 func logoutHandler(w httpRW, r httpReq) {
 	logout()
 	msg := &Feedback{Msg: "已登出, 请重新登入"}
 	checkErr(w, templates.ExecuteTemplate(w, "login", msg))
+}
+
+func homeHandler(w httpRW, r httpReq) {
+	http.Redirect(w, r, "/index/", http.StatusFound)
 }
 
 func indexHandler(w httpRW, r httpReq) {
@@ -114,7 +121,31 @@ func addHandler(w httpRW, r httpReq) {
 		return
 	}
 	db.Add(mima)
-	http.Redirect(w, r, "/index/", http.StatusFound)
+	http.Redirect(w, r, "/home/", http.StatusFound)
+}
+
+func deleteHandler(w httpRW, r httpReq) {
+	if r.Method != http.MethodPost {
+		form := new(MimaForm)
+		id, err := strconv.Atoi(r.FormValue("id"))
+		if err != nil {
+			form.Err = err
+			checkErr(w, templates.ExecuteTemplate(w, "delete", form))
+			return
+		}
+		if id <= 0 {
+			checkErr(w, templates.ExecuteTemplate(w, "delete", nil))
+			return
+		}
+		mima := db.GetByID(id)
+		if mima != nil {
+			form = mima.ToMimaForm().HidePassword()
+		} else {
+			form = nil
+		}
+		checkErr(w, templates.ExecuteTemplate(w, "delete", form))
+		return
+	}
 }
 
 func newPassword(w httpRW, r httpReq) {
