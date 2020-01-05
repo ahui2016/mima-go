@@ -23,6 +23,8 @@ type Mima struct {
 	// 别名, 用于辅助快速搜索 (准唯一)
 	// 特别是用于命令行, 有一个快速定位功能.
 	// 准唯一: 长度为零时允许重复, 长度大于零时要求唯一.
+	// 并且, 回收站里的 (DeletedAt 大于零的) 允许 Alias 重复.
+	// 注意从回收站恢复条目时 (把 DeletedAt 重置为零时), 需要检查 Alias 冲突.
 	Alias string
 
 	// 一次性随机码, 用于加密 (必须) (唯一)
@@ -33,7 +35,6 @@ type Mima struct {
 	Username  string
 	Password  string
 	Notes     string
-	Favorite  bool
 	CreatedAt int64
 	UpdatedAt int64
 	DeletedAt int64
@@ -87,7 +88,6 @@ func (mima *Mima) Update(fragment *Mima) {
 	mima.Username = fragment.Username
 	mima.Password = fragment.Password
 	mima.Notes = fragment.Notes
-	mima.Favorite = fragment.Favorite
 	mima.UpdatedAt = fragment.UpdatedAt
 	mima.HistoryItems = fragment.HistoryItems
 }
@@ -95,6 +95,11 @@ func (mima *Mima) Update(fragment *Mima) {
 // Delete 更新删除时间, 即软删除.
 func (mima *Mima) Delete() {
 	mima.DeletedAt = time.Now().UnixNano()
+}
+
+// IsDeleted 检查该 mima 是否已被软删除.
+func (mima *Mima) IsDeleted() bool {
+	return mima.DeletedAt > 0
 }
 
 // Undelete 把删除时间重置为零.
@@ -123,7 +128,6 @@ func (mima *Mima) ToMimaForm() *MimaForm {
 		Username:  mima.Username,
 		Password:  mima.Password,
 		Notes:     mima.Notes,
-		Favorite:  mima.Favorite,
 		CreatedAt: time.Unix(0, mima.CreatedAt).Format(dateAndTime),
 		UpdatedAt: time.Unix(0, mima.UpdatedAt).Format(dateAndTime),
 		DeletedAt: time.Unix(0, mima.DeletedAt).Format(dateAndTime),

@@ -16,7 +16,6 @@ type MimaForm struct {
 	Username  string
 	Password  string
 	Notes     string
-	Favorite  bool
 	CreatedAt string
 	UpdatedAt string
 	DeletedAt string
@@ -25,7 +24,9 @@ type MimaForm struct {
 
 // HidePasswordNotes 删除密码和备注, 用于不需要展示密码的页面 (为了提高安全性).
 func (form *MimaForm) HidePasswordNotes() *MimaForm {
-	form.Password = ""
+	if len(form.Password) > 0 {
+		form.Password = "******"
+	}
 	form.Notes = ""
 	return form
 }

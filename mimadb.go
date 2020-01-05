@@ -103,25 +103,20 @@ func (db *MimaDB) ToSlice() (mimaSlice []*Mima) {
 }
 
 // All 返回全部 Mima, 但不包含 ID:0, 也不包含已软删除的条目.
-// 并且, 不包含密码. 另外, 更新时间最新(最近)的排在前面, Favorite 顶置.
-func (db *MimaDB) All() []*MimaForm {
+// 并且, 不包含密码和备注. 另外, 更新时间最新(最近)的排在前面.
+func (db *MimaDB) All() (all []*MimaForm) {
 	if db.Items.Len() < 2 {
 		return nil
 	}
-	var favorites, notFav []*MimaForm
 	for e := db.Items.Back(); e.Prev() != nil; e = e.Prev() {
 		mima := e.Value.(*Mima)
-		if mima.DeletedAt > 0 {
+		if mima.IsDeleted() {
 			continue
 		}
 		form := mima.ToMimaForm().HidePasswordNotes()
-		if mima.Favorite {
-			favorites = append(favorites, form)
-		} else {
-			notFav = append(notFav, form)
-		}
+		all = append(all, form)
 	}
-	return append(favorites, notFav...)
+	return
 }
 
 // DeletedMimas 返回全部被软删除的 Mima, 不包含密码.
@@ -129,7 +124,7 @@ func (db *MimaDB) All() []*MimaForm {
 func (db *MimaDB) DeletedMimas() (deleted []*MimaForm) {
 	for e := db.Items.Back(); e.Prev() != nil; e = e.Prev() {
 		mima := e.Value.(*Mima)
-		if mima.DeletedAt <= 0 {
+		if !mima.IsDeleted() {
 			continue
 		}
 		form := mima.ToMimaForm().HidePasswordNotes()
@@ -264,6 +259,23 @@ func (db *MimaDB) GetByID(id int) *Mima {
 	return nil
 }
 
+// GetByAlias 凭 alias 找 mima, 如果找不到就返回 nil.
+func (db *MimaDB) GetByAlias(alias string) *Mima {
+	if alias == "" {
+		return nil
+	}
+	for e := db.Items.Back(); e.Prev() != nil; e = e.Prev() {
+		mima := e.Value.(*Mima)
+		if mima.IsDeleted() {
+			continue
+		}
+		if mima.Alias == alias {
+			return mima
+		}
+	}
+	return nil
+}
+
 func (db *MimaDB) getElementByID(id int) *list.Element {
 	// 这里的算法效率不高, 当预估数据量较大时需要改用更高效率的算法.
 	for e := db.Items.Front(); e != nil; e = e.Next() {
@@ -287,6 +299,9 @@ func (db *MimaDB) Add(mima *Mima) error {
 	if len(mima.Title) == 0 {
 		return errors.New("Title 标题长度必须大于零")
 	}
+	if m := db.GetByAlias(mima.Alias); m != nil {
+		return fmt.Errorf("唯一性冲突: alias [%s] 已存在", mima.Alias)
+	}
 	mima.ID = db.CurrentID
 	db.CurrentID++
 	db.insertByUpdatedAt(mima)
@@ -305,13 +320,22 @@ func (db *MimaDB) sealAndWriteFrag(mima *Mima, op Operation) error {
 
 // TrashByID 软删除一个 mima, 并生成一块数据库碎片.
 func (db *MimaDB) TrashByID(id int) error {
-	e := db.getElementByID(id)
-	if e == nil {
+	mima := db.GetByID(id)
+	if mima == nil {
 		return fmt.Errorf("NotFound: 找不到 id: %d 的条目", id)
 	}
-	mima := e.Value.(*Mima)
 	mima.Delete()
 	return db.sealAndWriteFrag(mima, SoftDelete)
+}
+
+// UndeleteByID 从回收站中还原一个 mima (DeletedAt 重置为零), 并生成一块数据库碎片.
+func (db *MimaDB) UndeleteByID(id int) error {
+	mima := db.GetByID(id)
+	if mima == nil {
+		return fmt.Errorf("NotFound: 找不到 id: %d 的条目", id)
+	}
+	mima.Undelete()
+	return db.sealAndWriteFrag(mima, Undelete)
 }
 
 // deleteByID 删除内存数据库中的指定条目.

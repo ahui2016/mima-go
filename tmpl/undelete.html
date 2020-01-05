@@ -1,0 +1,35 @@
+{{define "undelete"}}
+{{template "top"}}
+
+<p><a href="/home">mima-go</a> .. Undelete (还原)</p>
+
+<hr />
+
+{{ if . }}
+    {{if .Err}}
+        <p style="font-weight: bold; color: red">
+        Error: {{.Err}}
+        </p>
+    {{else}}
+        <form action="/undelete/" method="POST">
+            <input type="hidden" name="id" value="{{.ID}}" />
+            <p style="font-weight: bold; color: red">
+                Confirm: 还原这条记录吗? <input type="submit" value="Yes" />
+            </p>
+        </form>
+        <p>
+            <strong>Title: {{.Title}}</strong><br />
+            {{if .Username}}Username: {{.Username}}<br />{{end}}
+            {{if .Password}}Password: {{.Password}}<br />{{end}}
+            {{if .Notes}}Notes: {{.Notes}}{{end}}
+        </p>
+    {{end}}
+
+{{ else }}
+    <p style="font-weight: bold; color: red">
+        Not Found: 找不到这条记录。
+    </p>
+{{end}}
+
+{{template "bottom"}}
+{{end}}

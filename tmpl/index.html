@@ -5,32 +5,30 @@
 <hr />
 
 <p style="text-align:right">
-<a href="/search">Search</a>
+<a href="/Alias">Alias</a>
  . <a href="/add">Add</a>
  . <a href="/recyclebin">Recycle Bin</a>
 </p>
 
-{{range .}}
-    <div class="Item">
-        <div class="Title">
-            {{if .Favorite}}<div class="Favorite">★</div>
-            {{else}}<div class="NotFav">・</div>{{end}}
-            {{.Title}}
+<ul>
+    {{range .}}
+    <li>
+        <p>
+            <strong>{{.Title}}</strong>
             <span class="ButtonsForTitle">
-                <a href="#">名</a>
-                <a href="#">密</a>
+                {{if .Username}}<a href="#">名</a>{{end}}
+                {{if .Password}}<a href="#">密</a>{{end}}
                 <a href="/edit?id={{.ID}}">改</a>
                 <a href="/delete?id={{.ID}}">删</a>
-            </span>
-        </div>
-        <div style="margin-left: 2em">
-            {{if .Username}}{{.Username}}{{end}}<br/>
+            </span><br />
+            {{if .Username}}{{.Username}}<br/>{{end}}
             {{if .Notes}}{{.Notes}}{{end}}
-        </div>
-    </div>
-{{else}}
-    <p>空空如也。</p>
-{{end}}
+        </p>    
+    </li>
+    {{ else }}
+    <li>空空如也。</li>
+    {{end}}
+</ul>
 
 {{template "bottom"}}
 {{end}}
