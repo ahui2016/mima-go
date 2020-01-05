@@ -164,6 +164,7 @@ func (db *MimaDB) scanDBtoMemory() error {
 		if err != nil {
 			return fmt.Errorf("在初始化阶段解密失败: %w", err)
 		}
+		mima.Operation = 0
 		mima.ID = db.CurrentID
 		db.CurrentID++
 		db.Items.PushBack(mima)
@@ -290,11 +291,11 @@ func (db *MimaDB) Add(mima *Mima) error {
 	db.CurrentID++
 	db.insertByUpdatedAt(mima)
 
-	mima.Operation = Insert
-	return db.sealAndWriteFrag(mima)
+	return db.sealAndWriteFrag(mima, Insert)
 }
 
-func (db *MimaDB) sealAndWriteFrag(mima *Mima) error {
+func (db *MimaDB) sealAndWriteFrag(mima *Mima, op Operation) error {
+	mima.Operation = op
 	sealed, err := mima.Seal(db.key)
 	if err != nil {
 		return err
@@ -310,8 +311,7 @@ func (db *MimaDB) TrashByID(id int) error {
 	}
 	mima := e.Value.(*Mima)
 	mima.Delete()
-	mima.Operation = SoftDelete
-	return db.sealAndWriteFrag(mima)
+	return db.sealAndWriteFrag(mima, SoftDelete)
 }
 
 // deleteByID 删除内存数据库中的指定条目.

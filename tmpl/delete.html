@@ -11,8 +11,8 @@
         Error: {{.Err}}
         </p>
     {{else}}
-        <form action="/delete" method="POST">
-            <input type="hidden" name="ID" value="{{.ID}}" />
+        <form action="/delete/" method="POST">
+            <input type="hidden" name="id" value="{{.ID}}" />
             <p style="font-weight: bold; color: red">
                 Confirm: 扔进垃圾桶吗? (可恢复) <input type="submit" value="Yes" />
             </p>

@@ -125,27 +125,37 @@ func addHandler(w httpRW, r httpReq) {
 }
 
 func deleteHandler(w httpRW, r httpReq) {
+	form := new(MimaForm)
+	id, err := strconv.Atoi(r.FormValue("id"))
+	if err != nil {
+		form.Err = err
+		checkErr(w, templates.ExecuteTemplate(w, "delete", form))
+		return
+	}
+	if id <= 0 {
+		checkErr(w, templates.ExecuteTemplate(w, "delete", nil))
+		return
+	}
 	if r.Method != http.MethodPost {
-		form := new(MimaForm)
-		id, err := strconv.Atoi(r.FormValue("id"))
-		if err != nil {
-			form.Err = err
-			checkErr(w, templates.ExecuteTemplate(w, "delete", form))
-			return
-		}
-		if id <= 0 {
-			checkErr(w, templates.ExecuteTemplate(w, "delete", nil))
-			return
-		}
 		mima := db.GetByID(id)
 		if mima != nil {
-			form = mima.ToMimaForm().HidePassword()
+			if mima.DeletedAt > 0 {
+				form.Err = errors.New("此记录已被删除, 不可重复删除")
+			} else {
+				form = mima.ToMimaForm().HidePassword()
+			}
 		} else {
 			form = nil
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "delete", form))
 		return
 	}
+	if err := db.TrashByID(id); err != nil {
+		form.Err = err
+		checkErr(w, templates.ExecuteTemplate(w, "delete", form))
+		return
+	}
+	http.Redirect(w, r, "/home/", http.StatusFound)
 }
 
 func newPassword(w httpRW, r httpReq) {
