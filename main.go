@@ -26,6 +26,7 @@ func main() {
 	http.HandleFunc("/index/", noCache(checkState(indexHandler)))
 	http.HandleFunc("/add/", noCache(checkState(addHandler)))
 	http.HandleFunc("/delete/", noCache(checkState(deleteHandler)))
+	http.HandleFunc("/recyclebin/", noCache(checkState(recyclebin)))
 	http.HandleFunc("/api/new-password", newPassword)
 
 	fmt.Println(listenAddr)
@@ -98,6 +99,10 @@ func indexHandler(w httpRW, r httpReq) {
 	checkErr(w, templates.ExecuteTemplate(w, "index", db.All()))
 }
 
+func recyclebin(w httpRW, r httpReq) {
+	checkErr(w, templates.ExecuteTemplate(w, "recyclebin", db.DeletedMimas()))
+}
+
 func addHandler(w httpRW, r httpReq) {
 	if r.Method != http.MethodPost {
 		checkErr(w, templates.ExecuteTemplate(w, "add", nil))
@@ -142,7 +147,7 @@ func deleteHandler(w httpRW, r httpReq) {
 			if mima.DeletedAt > 0 {
 				form.Err = errors.New("此记录已被删除, 不可重复删除")
 			} else {
-				form = mima.ToMimaForm().HidePassword()
+				form = mima.ToMimaForm().HidePasswordNotes()
 			}
 		} else {
 			form = nil

@@ -1,0 +1,28 @@
+{{define "recyclebin"}}
+{{template "top"}}
+
+<p><a href="/home">mima-go</a> .. Recycle Bin</p>
+
+<hr />
+
+<ul>
+    {{range .}}
+    <li>
+        <p>
+            <strong>{{.Title}}</strong>
+            <span>
+              <a id="recover" href="/recover?id={{.ID}}">recover</a>
+              <a id="delete" href="/delete-forever?id={{.ID}}">delete</a>
+            </span><br />
+            <span class="Deleted" style="font-size:x-small;color:grey">deleted at {{.DeletedAt}}</span><br />
+            {{if .Username}}Username: {{.Username}}<br />{{end}}
+            {{if .Notes}}Notes: {{.Notes}}{{end}}
+        </p>    
+    </li>
+    {{ else }}
+    <li>没有垃圾。</li>
+    {{end}}
+</ul>
+
+{{template "bottom"}}
+{{end}}

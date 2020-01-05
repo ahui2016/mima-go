@@ -126,6 +126,7 @@ func (mima *Mima) ToMimaForm() *MimaForm {
 		Favorite:  mima.Favorite,
 		CreatedAt: time.Unix(0, mima.CreatedAt).Format(dateAndTime),
 		UpdatedAt: time.Unix(0, mima.UpdatedAt).Format(dateAndTime),
+		DeletedAt: time.Unix(0, mima.DeletedAt).Format(dateAndTime),
 	}
 }
 

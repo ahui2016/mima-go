@@ -23,9 +23,10 @@ type MimaForm struct {
 	Err       error
 }
 
-// HidePassword 删除密码, 用于不需要展示密码的页面 (为了提高安全性).
-func (form *MimaForm) HidePassword() *MimaForm {
+// HidePasswordNotes 删除密码和备注, 用于不需要展示密码的页面 (为了提高安全性).
+func (form *MimaForm) HidePasswordNotes() *MimaForm {
 	form.Password = ""
+	form.Notes = ""
 	return form
 }
 

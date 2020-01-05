@@ -114,7 +114,7 @@ func (db *MimaDB) All() []*MimaForm {
 		if mima.DeletedAt > 0 {
 			continue
 		}
-		form := mima.ToMimaForm().HidePassword()
+		form := mima.ToMimaForm().HidePasswordNotes()
 		if mima.Favorite {
 			favorites = append(favorites, form)
 		} else {
@@ -132,7 +132,7 @@ func (db *MimaDB) DeletedMimas() (deleted []*MimaForm) {
 		if mima.DeletedAt <= 0 {
 			continue
 		}
-		form := mima.ToMimaForm().HidePassword()
+		form := mima.ToMimaForm().HidePasswordNotes()
 		deleted = append(deleted, form)
 	}
 	sort.Slice(deleted, func(i, j int) bool {
