@@ -19,6 +19,7 @@
         </form>
         <p>
             <strong>Title: {{.Title}}</strong><br />
+            {{if .Alias}}Alias: {{.Alias}}<br/>{{end}}
             {{if .Username}}Username: {{.Username}}<br />{{end}}
             {{if .Password}}Password: {{.Password}}<br />{{end}}
             {{if .Notes}}Notes: {{.Notes}}{{end}}

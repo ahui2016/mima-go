@@ -43,7 +43,7 @@ func TestMakeFirstMima(t *testing.T) {
 	if testDB.Items.Len() != 1 {
 		t.Fatalf("db.Items.Len() want: 1, got: %d", testDB.Items.Len())
 	}
-	mima := testDB.GetByID(0) // 第一条数据的 id 固定为零
+	mima := testDB.Items.Front().Value.(*Mima)
 	if mima == nil {
 		t.Fatal("want a mima, got nil")
 	}

@@ -38,6 +38,7 @@ var (
 	db *MimaDB
 
 	dbFileNotFound error
+	errAliasExist  error
 )
 
 // Nonce 是 [NonceSize]byte 的别名.
@@ -55,6 +56,7 @@ func init() {
 	templates = template.Must(template.ParseGlob(filepath.Join(tmplDirPath, "*.html")))
 
 	dbFileNotFound = errors.New("找不到数据库文件")
+	errAliasExist = errors.New("该 alias 已存在")
 }
 
 func getBaseDir() string {

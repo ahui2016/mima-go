@@ -58,6 +58,17 @@ func NewMima(title string) (*Mima, error) {
 	return mima, nil
 }
 
+// NewMimaFromForm 根据 form 的信息生成一个新的 mima.
+func NewMimaFromForm(form *MimaForm) (mima *Mima, err error) {
+	if mima, err = NewMima(form.Title); err != nil {
+		return
+	}
+	mima.Username = form.Username
+	mima.Password = form.Password
+	mima.Notes = form.Notes
+	return
+}
+
 // DecryptToMima 从已加密数据中解密出一个 Mima 来.
 // 用于从数据库文件中读取数据进内存数据库.
 func DecryptToMima(box64 string, key SecretKey) (*Mima, error) {
@@ -121,6 +132,16 @@ func (mima *Mima) Seal(key SecretKey) (box64 string, err error) {
 
 // ToMimaForm 把 Mima 转换为 MimaForm, 用于与前端网页交流.
 func (mima *Mima) ToMimaForm() *MimaForm {
+	var createdAt, updatedAt, deletedAt string
+	if mima.CreatedAt > 0 {
+		createdAt = time.Unix(0, mima.CreatedAt).Format(dateAndTime)
+	}
+	if mima.UpdatedAt > 0 {
+		updatedAt = time.Unix(0, mima.UpdatedAt).Format(dateAndTime)
+	}
+	if mima.DeletedAt > 0 {
+		deletedAt = time.Unix(0, mima.DeletedAt).Format(dateAndTime)
+	}
 	return &MimaForm{
 		ID:        mima.ID,
 		Title:     mima.Title,
@@ -128,9 +149,9 @@ func (mima *Mima) ToMimaForm() *MimaForm {
 		Username:  mima.Username,
 		Password:  mima.Password,
 		Notes:     mima.Notes,
-		CreatedAt: time.Unix(0, mima.CreatedAt).Format(dateAndTime),
-		UpdatedAt: time.Unix(0, mima.UpdatedAt).Format(dateAndTime),
-		DeletedAt: time.Unix(0, mima.DeletedAt).Format(dateAndTime),
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
+		DeletedAt: deletedAt,
 	}
 }
 

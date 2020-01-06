@@ -21,6 +21,7 @@
                 <a href="/edit?id={{.ID}}">改</a>
                 <a href="/delete?id={{.ID}}">删</a>
             </span><br />
+            {{if .Alias}}[{{.Alias}}]<br/>{{end}}
             {{if .Username}}{{.Username}}<br/>{{end}}
             {{if .Notes}}{{.Notes}}{{end}}
         </p>    

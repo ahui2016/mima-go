@@ -28,6 +28,7 @@ func main() {
 	http.HandleFunc("/delete/", noCache(checkState(deleteHandler)))
 	http.HandleFunc("/recyclebin/", noCache(checkState(recyclebin)))
 	http.HandleFunc("/undelete/", noCache(checkState(undeleteHandler)))
+	http.HandleFunc("/edit/", noCache(checkState(editHandler)))
 	http.HandleFunc("/api/new-password", newPassword)
 
 	fmt.Println(listenAddr)
@@ -109,7 +110,7 @@ func addHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "add", nil))
 		return
 	}
-	form := MimaForm{
+	form := &MimaForm{
 		Title:    strings.TrimSpace(r.FormValue("Title")),
 		Username: strings.TrimSpace(r.FormValue("Username")),
 		Password: r.FormValue("Password"),
@@ -120,7 +121,7 @@ func addHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "add", form))
 		return
 	}
-	mima, err := form.ToMima()
+	mima, err := NewMimaFromForm(form)
 	if err != nil {
 		form.Err = err
 		checkErr(w, templates.ExecuteTemplate(w, "add", form))
@@ -130,28 +131,46 @@ func addHandler(w httpRW, r httpReq) {
 	http.Redirect(w, r, "/home/", http.StatusFound)
 }
 
-func deleteHandler(w httpRW, r httpReq) {
-	form := new(MimaForm)
+func editHandler(w httpRW, r httpReq) {
+	if r.Method != http.MethodPost {
+		form := new(MimaForm)
+		id, ok := getAndCheckID(w, r, "edit", form)
+		if !ok {
+			return
+		}
+		form = db.GetFormByID(id)
+		if form.IsDeleted() {
+			form = nil
+		}
+		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
+		return
+	}
+}
+
+func getAndCheckID(w httpRW, r httpReq, tmpl string, form *MimaForm) (id int, ok bool) {
 	id, err := strconv.Atoi(r.FormValue("id"))
 	if err != nil {
 		form.Err = err
-		checkErr(w, templates.ExecuteTemplate(w, "delete", form))
+		checkErr(w, templates.ExecuteTemplate(w, tmpl, form))
 		return
 	}
 	if id <= 0 {
-		checkErr(w, templates.ExecuteTemplate(w, "delete", nil))
+		checkErr(w, templates.ExecuteTemplate(w, tmpl, nil))
+		return
+	}
+	return id, true
+}
+
+func deleteHandler(w httpRW, r httpReq) {
+	form := new(MimaForm)
+	id, ok := getAndCheckID(w, r, "delete", form)
+	if !ok {
 		return
 	}
 	if r.Method != http.MethodPost {
-		mima := db.GetByID(id)
-		if mima != nil {
-			if mima.IsDeleted() {
-				form.Err = errors.New("此记录已被删除, 不可重复删除")
-			} else {
-				form = mima.ToMimaForm()
-			}
-		} else {
-			form = nil
+		form = db.GetFormByID(id)
+		if form.IsDeleted() {
+			form.Err = errors.New("此记录已被删除, 不可重复删除")
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "delete", form))
 		return
@@ -166,36 +185,33 @@ func deleteHandler(w httpRW, r httpReq) {
 
 func undeleteHandler(w httpRW, r httpReq) {
 	form := new(MimaForm)
-	id, err := strconv.Atoi(r.FormValue("id"))
+	id, ok := getAndCheckID(w, r, "undelete", form)
+	if !ok {
+		return
+	}
+	form = db.GetFormByID(id)
+	if !form.IsDeleted() {
+		form.Err = errors.New("此记录不在回收站中")
+	}
+	if r.Method != http.MethodPost {
+		if db.IsAliasExist(form.Alias) {
+			form.Info = fmt.Errorf(
+				"%w: %s, 如果确认还原此记录, 该 alias 将被清空", errAliasExist, form.Alias)
+		}
+		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
+		return
+	}
+	err := db.UndeleteByID(id)
+	if errors.Is(err, errAliasExist) {
+		form.Info = err
+		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
+		return
+	}
 	if err != nil {
 		form.Err = err
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
-	if id <= 0 {
-		checkErr(w, templates.ExecuteTemplate(w, "undelete", nil))
-		return
-	}
-	if r.Method != http.MethodPost {
-		mima := db.GetByID(id)
-		if mima != nil {
-			if !mima.IsDeleted() {
-				form.Err = errors.New("此记录不在回收站中 (已被还原)")
-			} else {
-				form = mima.ToMimaForm()
-			}
-		} else {
-			form = nil
-		}
-		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
-		return
-	}
-	if err := db.UndeleteByID(id); err != nil {
-		form.Err = err
-		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
-		return
-	}
-	http.Redirect(w, r, "/home/", http.StatusFound)
 }
 
 func newPassword(w httpRW, r httpReq) {

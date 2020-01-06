@@ -251,10 +251,19 @@ func (db *MimaDB) MakeFirstMima() error {
 	return writeFile(dbFullPath, box64)
 }
 
-// GetByID 凭 id 找 mima, 如果找不到就返回 nil.
+// GetByID 凭 id 找 mima, 如果找不到就返回 nil. 忽略 id:0.
 func (db *MimaDB) GetByID(id int) *Mima {
 	if e := db.getElementByID(id); e != nil {
 		return e.Value.(*Mima)
+	}
+	return nil
+}
+
+// GetFormByID 凭 id 找 mima 并转换为 MimaForm, 如果找不到就返回 nil.
+// 忽略 id:0.
+func (db *MimaDB) GetFormByID(id int) *MimaForm {
+	if mima := db.GetByID(id); mima != nil {
+		return mima.ToMimaForm()
 	}
 	return nil
 }
@@ -278,7 +287,7 @@ func (db *MimaDB) GetByAlias(alias string) *Mima {
 
 func (db *MimaDB) getElementByID(id int) *list.Element {
 	// 这里的算法效率不高, 当预估数据量较大时需要改用更高效率的算法.
-	for e := db.Items.Front(); e != nil; e = e.Next() {
+	for e := db.Items.Back(); e.Prev() != nil; e = e.Prev() { // 忽略 id:0
 		mima := e.Value.(*Mima)
 		if mima.ID == id {
 			return e
@@ -288,6 +297,7 @@ func (db *MimaDB) getElementByID(id int) *list.Element {
 }
 
 // Add 新增一个 mima 到数据库中, 并生成一块数据库碎片.
+// 此时不检查 Alias 冲突, 因为此时不新增 Alias. 只能在 Edit 时增加新的 Alias.
 func (db *MimaDB) Add(mima *Mima) error {
 	if db.Items.Len() == 0 {
 		// 第一条记录特殊处理,
@@ -298,9 +308,6 @@ func (db *MimaDB) Add(mima *Mima) error {
 	}
 	if len(mima.Title) == 0 {
 		return errors.New("Title 标题长度必须大于零")
-	}
-	if m := db.GetByAlias(mima.Alias); m != nil {
-		return fmt.Errorf("唯一性冲突: alias [%s] 已存在", mima.Alias)
 	}
 	mima.ID = db.CurrentID
 	db.CurrentID++
@@ -329,13 +336,29 @@ func (db *MimaDB) TrashByID(id int) error {
 }
 
 // UndeleteByID 从回收站中还原一个 mima (DeletedAt 重置为零), 并生成一块数据库碎片.
-func (db *MimaDB) UndeleteByID(id int) error {
+// 此时, 需要判断 Alias 有无冲突, 如有冲突则清空本条记录的 Alias.
+func (db *MimaDB) UndeleteByID(id int) (err error) {
 	mima := db.GetByID(id)
 	if mima == nil {
 		return fmt.Errorf("NotFound: 找不到 id: %d 的条目", id)
 	}
+	if db.IsAliasExist(mima.Alias) {
+		err = fmt.Errorf("%w: %s, 因此此记录的 alias 已被清空", errAliasExist, mima.Alias)
+		mima.Alias = ""
+	}
 	mima.Undelete()
-	return db.sealAndWriteFrag(mima, Undelete)
+	if err2 := db.sealAndWriteFrag(mima, Undelete); err2 != nil {
+		return err2
+	}
+	return
+}
+
+// IsAliasExist 判断 alias 有无冲突.
+func (db *MimaDB) IsAliasExist(alias string) (ok bool) {
+	if m := db.GetByAlias(alias); m != nil {
+		ok = true
+	}
+	return
 }
 
 // deleteByID 删除内存数据库中的指定条目.

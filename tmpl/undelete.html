@@ -16,9 +16,13 @@
             <p style="font-weight: bold; color: red">
                 Confirm: 还原这条记录吗? <input type="submit" value="Yes" />
             </p>
+            {{if .Info}}
+            <p  style="font-weight: bold; color: blue">{{.Info}}</p>
+            {{end}}
         </form>
         <p>
             <strong>Title: {{.Title}}</strong><br />
+            {{if .Alias}}Alias: {{.Alias}}<br/>{{end}}
             {{if .Username}}Username: {{.Username}}<br />{{end}}
             {{if .Password}}Password: {{.Password}}<br />{{end}}
             {{if .Notes}}Notes: {{.Notes}}{{end}}

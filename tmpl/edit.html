@@ -1,0 +1,62 @@
+{{define "edit"}}
+{{template "top"}}
+
+<p><a href="/home">mima-go</a> .. Edit</p>
+
+<hr />
+
+{{if .}}
+
+  {{if .Err}}
+      <p style="font-weight: bold; color: red">
+      Error: {{.Err}}
+      </p>
+  {{end}}
+
+  {{if .Info}}
+      <p style="font-weight: bold; color: blue">
+      Info: {{.Info}}
+      </p>
+  {{end}}
+
+  <form action="/edit/" method="POST" autocomplete="off">
+    <label for="Title">Title:</label>
+      <input type="text" name="Title" id="Title" class="Fields" autofocus required
+            onblur="this.value = this.value.trim()" />
+    <label for="Username">Alias:</label>
+      <input type="text" name="Alias" id="Alias" class="Fields"
+              onblur="this.value = this.value.trim()" />
+    <label for="Username">Username:</label>
+      <input type="text" name="Username" id="Username" class="Fields"
+            onblur="this.value = this.value.trim()" />
+    <label for="Password">Password: (<a href="#" onclick="generatePW()">generate</a>)</label>
+      <input type="text" name="Password" id="Password" class="Fields"
+            style="font-family:Serif;" 
+            value="{{.Password}}" oninput="display_pwd()" />
+      <div id="pwd" style="font-size: larger;margin-left: 1.1em;"></div>
+    <label for="Notes">Notes:</label>
+      <textarea name="Notes" id="Notes" class="Fields"></textarea>
+    <p>
+      <input type="submit" value="Submit" />
+    </p>
+  </form>
+
+  {{template "display-pwd"}}
+
+  <script type="text/javascript">
+  document.getElementById('Title').value = {{.Title}}
+  document.getElementById('Alias').value = {{.Alias}}
+  document.getElementById('Username').value = {{.Username}}
+  document.getElementById('Password').value = {{.Password}}
+  document.getElementById('Notes').value = {{.Notes}}
+  display_pwd()
+  </script>
+
+{{else}}
+  <p style="font-weight: bold; color: red">
+    Not Found: 找不到这条记录。
+  </p>
+{{end}}
+
+{{template "bottom"}}
+{{end}}
