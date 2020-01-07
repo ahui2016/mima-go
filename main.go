@@ -132,8 +132,8 @@ func editHandler(w httpRW, r httpReq) {
 			return
 		}
 		form = db.GetFormByID(id)
-		if form.Err != nil || form.IsDeleted() {
-			form = nil
+		if form.IsDeleted() {
+			form = &MimaForm{Err: errors.New("此记录已被删除, 不可编辑")}
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
 		return
@@ -231,6 +231,7 @@ func newPassword(w httpRW, r httpReq) {
 
 func checkErr(w httpRW, err error) {
 	if err != nil {
+		log.Println(err)
 		fmt.Fprintf(w, "%v", err)
 	}
 }
