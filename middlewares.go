@@ -11,22 +11,6 @@ func withPattern(pattern string, fn func(httpRW, httpReq, string)) httpHF {
 	}
 }
 
-func dbLock(fn httpHF) httpHF {
-	db.Lock()
-	defer db.Unlock()
-	return func(w httpRW, r httpReq) {
-		fn(w, r)
-	}
-}
-
-func dbRLock(fn httpHF) httpHF {
-	db.RLock()
-	defer db.RUnlock()
-	return func(w httpRW, r httpReq) {
-		fn(w, r)
-	}
-}
-
 func checkState(fn httpHF) httpHF {
 	return func(w httpRW, r httpReq) {
 		if !isLoggedOut() {
@@ -40,6 +24,8 @@ func checkState(fn httpHF) httpHF {
 			}
 
 			// 已登入, 未超时, 重新计时.
+			db.Lock()
+			defer db.Unlock()
 			db.StartedAt = time.Now()
 			fn(w, r)
 			return

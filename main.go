@@ -19,16 +19,16 @@ type (
 )
 
 func main() {
-	http.HandleFunc("/create-account", noCache(dbLock(createAccount)))
-	http.HandleFunc("/login", noCache(dbLock(loginHandler)))
+	http.HandleFunc("/create-account", noCache(createAccount))
+	http.HandleFunc("/login", noCache(loginHandler))
 	http.HandleFunc("/logout", noCache(logoutHandler))
 	http.HandleFunc("/home/", homeHandler)
-	http.HandleFunc("/index/", noCache(checkState(dbRLock(indexHandler))))
-	http.HandleFunc("/add/", noCache(checkState(dbLock(addHandler))))
-	http.HandleFunc("/delete/", noCache(checkState(dbLock(deleteHandler))))
-	http.HandleFunc("/recyclebin/", noCache(checkState(dbRLock(recyclebin))))
-	http.HandleFunc("/undelete/", noCache(checkState(dbLock(undeleteHandler))))
-	http.HandleFunc("/edit/", noCache(checkState(dbLock(editHandler))))
+	http.HandleFunc("/index/", noCache(checkState(indexHandler)))
+	http.HandleFunc("/add/", noCache(checkState(addHandler)))
+	http.HandleFunc("/delete/", noCache(checkState(deleteHandler)))
+	http.HandleFunc("/recyclebin/", noCache(checkState(recyclebin)))
+	http.HandleFunc("/undelete/", noCache(checkState(undeleteHandler)))
+	http.HandleFunc("/edit/", noCache(checkState(editHandler)))
 	http.HandleFunc("/api/new-password", newPassword)
 
 	fmt.Println(listenAddr)
@@ -112,11 +112,6 @@ func addHandler(w httpRW, r httpReq) {
 		Password: r.FormValue("Password"),
 		Notes:    strings.TrimSpace(r.FormValue("Notes")),
 	}
-	if form.Title == "" {
-		form.Err = errors.New("标题不可为空, 请填写标题")
-		checkErr(w, templates.ExecuteTemplate(w, "add", form))
-		return
-	}
 	mima, err := NewMimaFromForm(form)
 	if err == nil {
 		err = db.Add(mima)
@@ -137,7 +132,7 @@ func editHandler(w httpRW, r httpReq) {
 			return
 		}
 		form = db.GetFormByID(id)
-		if form.IsDeleted() {
+		if form.Err != nil || form.IsDeleted() {
 			form = nil
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
@@ -164,8 +159,9 @@ func getAndCheckID(w httpRW, r httpReq, tmpl string, form *MimaForm) (id int, ok
 		checkErr(w, templates.ExecuteTemplate(w, tmpl, form))
 		return
 	}
-	if id <= 0 {
-		checkErr(w, templates.ExecuteTemplate(w, tmpl, nil))
+	if id <= 0 || id >= db.NextID {
+		form.Err = fmt.Errorf("id: %d out of range", id)
+		checkErr(w, templates.ExecuteTemplate(w, tmpl, form))
 		return
 	}
 	return id, true

@@ -39,6 +39,7 @@ var (
 
 	dbFileNotFound error
 	errAliasExist  error
+	errNeedTitle   error
 )
 
 // Nonce 是 [NonceSize]byte 的别名.
@@ -57,6 +58,7 @@ func init() {
 
 	dbFileNotFound = errors.New("找不到数据库文件")
 	errAliasExist = errors.New("该 alias 已存在")
+	errNeedTitle = errors.New("Title 标题长度必须大于零")
 }
 
 func getBaseDir() string {

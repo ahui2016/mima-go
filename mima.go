@@ -92,8 +92,8 @@ func DecryptToMima(box64 string, key SecretKey) (*Mima, error) {
 	return mima, nil
 }
 
-// Update 以数据库碎片中的内容为准, 更新内存中的条目. (不包括软删除)
-func (mima *Mima) Update(fragment *Mima) {
+// UpdateFromFrag 以数据库碎片中的内容为准, 更新内存中的条目.
+func (mima *Mima) UpdateFromFrag(fragment *Mima) {
 	mima.Title = fragment.Title
 	mima.Alias = fragment.Alias
 	mima.Username = fragment.Username
@@ -101,6 +101,30 @@ func (mima *Mima) Update(fragment *Mima) {
 	mima.Notes = fragment.Notes
 	mima.UpdatedAt = fragment.UpdatedAt
 	mima.HistoryItems = fragment.HistoryItems
+}
+
+// UpdateFromForm 以前端传回来的 MimaForm 为准, 更新内存中的条目内容.
+func (mima *Mima) UpdateFromForm(form *MimaForm) {
+	updatedAt := time.Now().UnixNano()
+	mima.makeHistory(updatedAt)
+
+	mima.Title = form.Title
+	mima.Alias = form.Alias
+	mima.Username = form.Username
+	mima.Password = form.Password
+	mima.Notes = form.Notes
+	mima.UpdatedAt = updatedAt
+}
+
+func (mima *Mima) makeHistory(updatedAt int64) {
+	h := History{
+		Title:     mima.Title,
+		Username:  mima.Username,
+		Password:  mima.Password,
+		Notes:     mima.Notes,
+		UpdatedAt: updatedAt,
+	}
+	mima.HistoryItems = append(mima.HistoryItems, h)
 }
 
 // Delete 更新删除时间, 即软删除.

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,7 +33,7 @@ type MimaDB struct {
 	sync.RWMutex
 
 	// 主要用于 MimaDB.Add 中
-	CurrentID int
+	NextID int
 
 	// 原始数据, 按 UpdatedAt 排序.
 	Items *list.List
@@ -160,8 +161,8 @@ func (db *MimaDB) scanDBtoMemory() error {
 			return fmt.Errorf("在初始化阶段解密失败: %w", err)
 		}
 		mima.Operation = 0
-		mima.ID = db.CurrentID
-		db.CurrentID++
+		mima.ID = db.NextID
+		db.NextID++
 		db.Items.PushBack(mima)
 	}
 	if err := scanner.Err(); err != nil {
@@ -183,15 +184,15 @@ func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
 			continue
 		}
 
-		item := db.GetByID(mima.ID)
-		if item == nil {
-			return fmt.Errorf("NotFound: 找不到 id: %d 的条目", mima.ID)
+		item, err := db.GetByID(mima.ID)
+		if err != nil {
+			return err
 		}
 
 		switch mima.Operation {
 		case Insert: // 上面已操作, 这里不需要再操作.
 		case Update:
-			item.Update(mima)
+			item.UpdateFromFrag(mima)
 		case SoftDelete:
 			item.Delete()
 		case Undelete:
@@ -252,20 +253,22 @@ func (db *MimaDB) MakeFirstMima() error {
 }
 
 // GetByID 凭 id 找 mima, 如果找不到就返回 nil. 忽略 id:0.
-func (db *MimaDB) GetByID(id int) *Mima {
+// 只有一种错误: 找不到记录.
+func (db *MimaDB) GetByID(id int) (*Mima, error) {
 	if e := db.getElementByID(id); e != nil {
-		return e.Value.(*Mima)
+		return e.Value.(*Mima), nil
 	}
-	return nil
+	return nil, fmt.Errorf("NotFound: 找不到 id: %d 的记录", id)
 }
 
-// GetFormByID 凭 id 找 mima 并转换为 MimaForm, 如果找不到就返回 nil.
-// 忽略 id:0.
+// GetFormByID 凭 id 找 mima 并转换为 MimaForm. 忽略 id:0.
+// 只有一种错误: 找不到记录, 并且该错误信息已内嵌到 MimaForm 中.
 func (db *MimaDB) GetFormByID(id int) *MimaForm {
-	if mima := db.GetByID(id); mima != nil {
-		return mima.ToMimaForm()
+	mima, err := db.GetByID(id)
+	if err != nil {
+		return &MimaForm{Err: err}
 	}
-	return nil
+	return mima.ToMimaForm()
 }
 
 // GetByAlias 凭 alias 找 mima, 如果找不到就返回 nil.
@@ -303,21 +306,34 @@ func (db *MimaDB) Add(mima *Mima) error {
 		// 第一条记录特殊处理,
 		// 尤其注意从数据库文件读取数据到内存时, 确保第一条读入的是那条特殊记录.
 		db.Items.PushFront(mima)
-		db.CurrentID++
+		db.NextID++
 		return nil
 	}
+	mima.Title = strings.TrimSpace(mima.Title)
 	if len(mima.Title) == 0 {
-		return errors.New("Title 标题长度必须大于零")
+		return errNeedTitle
 	}
-	mima.ID = db.CurrentID
-	db.CurrentID++
+	mima.ID = db.NextID
+	db.NextID++
 	db.insertByUpdatedAt(mima)
 
 	return db.sealAndWriteFrag(mima, Insert)
 }
 
-func (db *MimaDB) Update(form *MimaForm) {
-
+// Update 根据 MimaForm 更新对应的 Mima 内容, 并生成一块数据库碎片.
+func (db *MimaDB) Update(form *MimaForm) error {
+	if len(form.Title) == 0 {
+		return errNeedTitle
+	}
+	if db.IsAliasExist(form.Alias) {
+		return errAliasExist
+	}
+	mima, err := db.GetByID(form.ID)
+	if err != nil {
+		return err
+	}
+	mima.UpdateFromForm(form)
+	return db.sealAndWriteFrag(mima, Update)
 }
 
 func (db *MimaDB) sealAndWriteFrag(mima *Mima, op Operation) error {
@@ -331,9 +347,9 @@ func (db *MimaDB) sealAndWriteFrag(mima *Mima, op Operation) error {
 
 // TrashByID 软删除一个 mima, 并生成一块数据库碎片.
 func (db *MimaDB) TrashByID(id int) error {
-	mima := db.GetByID(id)
-	if mima == nil {
-		return fmt.Errorf("NotFound: 找不到 id: %d 的条目", id)
+	mima, err := db.GetByID(id)
+	if err != nil {
+		return err
 	}
 	mima.Delete()
 	return db.sealAndWriteFrag(mima, SoftDelete)
@@ -342,9 +358,9 @@ func (db *MimaDB) TrashByID(id int) error {
 // UndeleteByID 从回收站中还原一个 mima (DeletedAt 重置为零), 并生成一块数据库碎片.
 // 此时, 需要判断 Alias 有无冲突, 如有冲突则清空本条记录的 Alias.
 func (db *MimaDB) UndeleteByID(id int) (err error) {
-	mima := db.GetByID(id)
-	if mima == nil {
-		return fmt.Errorf("NotFound: 找不到 id: %d 的条目", id)
+	mima, err := db.GetByID(id)
+	if err != nil {
+		return err
 	}
 	if db.IsAliasExist(mima.Alias) {
 		err = fmt.Errorf("%w: %s, 因此此记录的 alias 已被清空", errAliasExist, mima.Alias)
