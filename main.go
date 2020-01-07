@@ -19,16 +19,16 @@ type (
 )
 
 func main() {
-	http.HandleFunc("/create-account", noCache(createAccount))
-	http.HandleFunc("/login", noCache(loginHandler))
+	http.HandleFunc("/create-account", noCache(dbLock(createAccount)))
+	http.HandleFunc("/login", noCache(dbLock(loginHandler)))
 	http.HandleFunc("/logout", noCache(logoutHandler))
 	http.HandleFunc("/home/", homeHandler)
-	http.HandleFunc("/index/", noCache(checkState(indexHandler)))
-	http.HandleFunc("/add/", noCache(checkState(addHandler)))
-	http.HandleFunc("/delete/", noCache(checkState(deleteHandler)))
-	http.HandleFunc("/recyclebin/", noCache(checkState(recyclebin)))
-	http.HandleFunc("/undelete/", noCache(checkState(undeleteHandler)))
-	http.HandleFunc("/edit/", noCache(checkState(editHandler)))
+	http.HandleFunc("/index/", noCache(checkState(dbRLock(indexHandler))))
+	http.HandleFunc("/add/", noCache(checkState(dbLock(addHandler))))
+	http.HandleFunc("/delete/", noCache(checkState(dbLock(deleteHandler))))
+	http.HandleFunc("/recyclebin/", noCache(checkState(dbRLock(recyclebin))))
+	http.HandleFunc("/undelete/", noCache(checkState(dbLock(undeleteHandler))))
+	http.HandleFunc("/edit/", noCache(checkState(dbLock(editHandler))))
 	http.HandleFunc("/api/new-password", newPassword)
 
 	fmt.Println(listenAddr)
@@ -53,8 +53,6 @@ func createAccount(w httpRW, r httpReq) {
 	}
 	key := sha256.Sum256([]byte(password))
 	db = NewMimaDB(&key)
-	db.Lock()
-	defer db.Unlock()
 	if err := db.MakeFirstMima(); err != nil {
 		checkErr(w, templates.ExecuteTemplate(w, "create-account", &Feedback{Err: err}))
 		return
@@ -77,8 +75,6 @@ func loginHandler(w httpRW, r httpReq) {
 	password := r.FormValue("password")
 	key := sha256.Sum256([]byte(password))
 	db = NewMimaDB(&key)
-	db.Lock()
-	defer db.Unlock()
 	if _, err := db.Rebuild(); err != nil {
 		logout()
 		checkErr(w, templates.ExecuteTemplate(w, "login", &Feedback{Err: err}))
@@ -122,12 +118,14 @@ func addHandler(w httpRW, r httpReq) {
 		return
 	}
 	mima, err := NewMimaFromForm(form)
+	if err == nil {
+		err = db.Add(mima)
+	}
 	if err != nil {
 		form.Err = err
 		checkErr(w, templates.ExecuteTemplate(w, "add", form))
 		return
 	}
-	db.Add(mima)
 	http.Redirect(w, r, "/home/", http.StatusFound)
 }
 
@@ -143,6 +141,18 @@ func editHandler(w httpRW, r httpReq) {
 			form = nil
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
+		return
+	}
+	form := &MimaForm{
+		Title:    strings.TrimSpace(r.FormValue("Title")),
+		Alias:    strings.TrimSpace(r.FormValue("Alias")),
+		Username: strings.TrimSpace(r.FormValue("Username")),
+		Password: r.FormValue("Password"),
+		Notes:    strings.TrimSpace(r.FormValue("Notes")),
+	}
+	if form.Title == "" {
+		form.Err = errors.New("标题不可为空, 请填写标题")
+		checkErr(w, templates.ExecuteTemplate(w, "add", form))
 		return
 	}
 }

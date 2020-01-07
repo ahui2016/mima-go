@@ -316,6 +316,10 @@ func (db *MimaDB) Add(mima *Mima) error {
 	return db.sealAndWriteFrag(mima, Insert)
 }
 
+func (db *MimaDB) Update(form *MimaForm) {
+
+}
+
 func (db *MimaDB) sealAndWriteFrag(mima *Mima, op Operation) error {
 	mima.Operation = op
 	sealed, err := mima.Seal(db.key)
