@@ -52,8 +52,8 @@ func createAccount(w httpRW, r httpReq) {
 		return
 	}
 	key := sha256.Sum256([]byte(password))
-	db = NewMimaDB(&key)
-	if err := db.MakeFirstMima(); err != nil {
+	mdb = NewMimaDB(&key)
+	if err := mdb.MakeFirstMima(); err != nil {
 		checkErr(w, templates.ExecuteTemplate(w, "create-account", &Feedback{Err: err}))
 		return
 	}
@@ -74,8 +74,8 @@ func loginHandler(w httpRW, r httpReq) {
 	}
 	password := r.FormValue("password")
 	key := sha256.Sum256([]byte(password))
-	db = NewMimaDB(&key)
-	if _, err := db.Rebuild(); err != nil {
+	mdb = NewMimaDB(&key)
+	if _, err := mdb.Rebuild(); err != nil {
 		logout()
 		checkErr(w, templates.ExecuteTemplate(w, "login", &Feedback{Err: err}))
 		return
@@ -94,11 +94,11 @@ func homeHandler(w httpRW, r httpReq) {
 }
 
 func indexHandler(w httpRW, r httpReq) {
-	checkErr(w, templates.ExecuteTemplate(w, "index", db.All()))
+	checkErr(w, templates.ExecuteTemplate(w, "index", mdb.All()))
 }
 
 func recyclebin(w httpRW, r httpReq) {
-	checkErr(w, templates.ExecuteTemplate(w, "recyclebin", db.DeletedMimas()))
+	checkErr(w, templates.ExecuteTemplate(w, "recyclebin", mdb.DeletedMimas()))
 }
 
 func addHandler(w httpRW, r httpReq) {
@@ -114,7 +114,7 @@ func addHandler(w httpRW, r httpReq) {
 	}
 	mima, err := NewMimaFromForm(form)
 	if err == nil {
-		err = db.Add(mima)
+		err = mdb.Add(mima)
 	}
 	if err != nil {
 		form.Err = err
@@ -125,31 +125,32 @@ func addHandler(w httpRW, r httpReq) {
 }
 
 func editHandler(w httpRW, r httpReq) {
+	form := new(MimaForm)
+	id, ok := getAndCheckID(w, r, "edit", form)
+	if !ok {
+		return
+	}
 	if r.Method != http.MethodPost {
-		form := new(MimaForm)
-		id, ok := getAndCheckID(w, r, "edit", form)
-		if !ok {
-			return
-		}
-		form = db.GetFormByID(id)
+		form = mdb.GetFormByID(id)
 		if form.IsDeleted() {
 			form = &MimaForm{Err: errors.New("此记录已被删除, 不可编辑")}
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
 		return
 	}
-	form := &MimaForm{
+	form = &MimaForm{
+		ID:       id,
 		Title:    strings.TrimSpace(r.FormValue("Title")),
 		Alias:    strings.TrimSpace(r.FormValue("Alias")),
 		Username: strings.TrimSpace(r.FormValue("Username")),
 		Password: r.FormValue("Password"),
 		Notes:    strings.TrimSpace(r.FormValue("Notes")),
 	}
-	if form.Title == "" {
-		form.Err = errors.New("标题不可为空, 请填写标题")
-		checkErr(w, templates.ExecuteTemplate(w, "add", form))
-		return
-	}
+	// if err := mdb.Update(form); err != nil {
+	// 	form.Err = err
+	// 	checkErr(w, templates.ExecuteTemplate(w, "edit", form))
+	// 	return
+	// }
 }
 
 func getAndCheckID(w httpRW, r httpReq, tmpl string, form *MimaForm) (id int, ok bool) {
@@ -159,7 +160,7 @@ func getAndCheckID(w httpRW, r httpReq, tmpl string, form *MimaForm) (id int, ok
 		checkErr(w, templates.ExecuteTemplate(w, tmpl, form))
 		return
 	}
-	if id <= 0 || id >= db.NextID {
+	if id <= 0 || id >= mdb.NextID {
 		form.Err = fmt.Errorf("id: %d out of range", id)
 		checkErr(w, templates.ExecuteTemplate(w, tmpl, form))
 		return
@@ -174,14 +175,14 @@ func deleteHandler(w httpRW, r httpReq) {
 		return
 	}
 	if r.Method != http.MethodPost {
-		form = db.GetFormByID(id)
+		form = mdb.GetFormByID(id)
 		if form.IsDeleted() {
 			form.Err = errors.New("此记录已被删除, 不可重复删除")
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "delete", form))
 		return
 	}
-	if err := db.TrashByID(id); err != nil {
+	if err := mdb.TrashByID(id); err != nil {
 		form.Err = err
 		checkErr(w, templates.ExecuteTemplate(w, "delete", form))
 		return
@@ -195,19 +196,19 @@ func undeleteHandler(w httpRW, r httpReq) {
 	if !ok {
 		return
 	}
-	form = db.GetFormByID(id)
+	form = mdb.GetFormByID(id)
 	if !form.IsDeleted() {
 		form.Err = errors.New("此记录不在回收站中")
 	}
 	if r.Method != http.MethodPost {
-		if db.IsAliasExist(form.Alias) {
+		if mdb.IsAliasExist(form.Alias) {
 			form.Info = fmt.Errorf(
 				"%w: %s, 如果确认还原此记录, 该 alias 将被清空", errAliasExist, form.Alias)
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
-	err := db.UndeleteByID(id)
+	err := mdb.UndeleteByID(id)
 	if errors.Is(err, errAliasExist) {
 		form.Info = err
 		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
@@ -237,9 +238,9 @@ func checkErr(w httpRW, err error) {
 }
 
 func logout() {
-	db = nil
+	mdb = nil
 }
 
 func isLoggedOut() bool {
-	return db == nil
+	return mdb == nil
 }

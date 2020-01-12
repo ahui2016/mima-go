@@ -19,7 +19,7 @@
 
 {{ if .ID }}
 <form action="/edit/" method="POST" autocomplete="off">
-  <input type="hidden" name="ID" value="{{.ID}}" />
+  <input type="hidden" name="id" value="{{.ID}}" />
   <label for="Title">Title:</label>
     <input type="text" name="Title" id="Title" class="Fields" autofocus required
            value="{{.Title}}" onblur="this.value = this.value.trim()" />

@@ -1,6 +1,6 @@
 # Todos
 
-- Alias 功能
+- 密码与密钥分开
 
 ## 特色: Alias
 

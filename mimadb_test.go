@@ -41,7 +41,7 @@ func TestMakeFirstMima(t *testing.T) {
 
 	// 检查内存中的 mima 是否正确
 	if testDB.Items.Len() != 1 {
-		t.Fatalf("db.Items.Len() want: 1, got: %d", testDB.Items.Len())
+		t.Fatalf("mdb.Items.Len() want: 1, got: %d", testDB.Items.Len())
 	}
 	mima := testDB.Items.Front().Value.(*Mima)
 	if mima == nil {

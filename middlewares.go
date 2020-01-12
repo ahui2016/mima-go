@@ -14,7 +14,7 @@ func withPattern(pattern string, fn func(httpRW, httpReq, string)) httpHF {
 func checkState(fn httpHF) httpHF {
 	return func(w httpRW, r httpReq) {
 		if !isLoggedOut() {
-			expired := db.StartedAt.Add(db.Period)
+			expired := mdb.StartedAt.Add(mdb.Period)
 			if time.Now().After(expired) {
 				// 已登入, 但超时.
 				logout()
@@ -24,9 +24,9 @@ func checkState(fn httpHF) httpHF {
 			}
 
 			// 已登入, 未超时, 重新计时.
-			db.Lock()
-			defer db.Unlock()
-			db.StartedAt = time.Now()
+			mdb.Lock()
+			defer mdb.Unlock()
+			mdb.StartedAt = time.Now()
 			fn(w, r)
 			return
 		}

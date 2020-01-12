@@ -18,11 +18,11 @@ const (
 
 	tmplDir = "tmpl"
 	DBDir   = "mimadb"
-	DBName  = "mima.db"
+	DBName  = "mima.mdb"
 	TempDir = "temp_dir_for_test"
 
 	// 数据库碎片文件的后缀名
-	FragExt = ".db.frag"
+	FragExt = ".mdb.frag"
 
 	// 数据库备份文件的后缀名
 	tarballExt = ".tar.gz"
@@ -35,7 +35,7 @@ var (
 	tmplDirPath string
 	templates   *template.Template
 
-	db *MimaDB
+	mdb *MimaDB
 
 	dbFileNotFound error
 	errAliasExist  error
