@@ -2,6 +2,8 @@
   <dictionary name="ahui">
     <words>
       <w>mima</w>
+      <w>mimadb</w>
+      <w>secretbox</w>
     </words>
   </dictionary>
 </component>

@@ -1,6 +1,12 @@
-# Todos
+# Todo
 
-- 密码与密钥分开
+- 当且只当 Operation.Update 的时候才需要使用 MimaDB.findUpdatedAfter,
+  完全不需要用到 insertByUpdatedAt ?
+  - 不对, findUpdatedAfter 也不需要使用
+  - Add: 永远追加到数组的末尾
+  - Delete: 删除, 不需要追加
+  - Edit: 更新后, 也是移动到末尾, 不会移动到其他位置
+  - 需要确保数据库碎片的文件名按顺序排列, 根据时间先后顺序逐条处理
 
 ## 特色: Alias
 

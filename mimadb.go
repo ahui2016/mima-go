@@ -25,7 +25,7 @@ const (
 	Insert Operation = iota + 1
 	Update
 	SoftDelete
-	Undelete
+	UnDelete
 	DeleteForever
 )
 
@@ -54,11 +54,20 @@ func NewMimaDB(key SecretKey) *MimaDB {
 	}
 	return &MimaDB{
 		NextID:    1, // 编号从 1 开始, 第 0 条记录特殊处理.
-		Items:     make([]*Mima, 1),
+		Items:     []*Mima{},
 		key:       key,
 		StartedAt: time.Now(),
 		Period:    time.Minute * 5,
 	}
+}
+
+// Len 返回 MimaDB.Items 的长度.
+func (db *MimaDB) Len() int {
+	return len(db.Items)
+}
+
+func (db *MimaDB) lastIndex() int {
+	return db.Len() - 1
 }
 
 // Rebuild 填充内存数据库，读取数据库碎片, 整合到数据库文件中.
@@ -100,10 +109,10 @@ func (db *MimaDB) Rebuild() (tarballFile string, err error) {
 // All 返回全部 Mima, 但不包含 ID:0, 也不包含已软删除的条目.
 // 并且, 不包含密码和备注. 另外, 更新时间最新(最近)的排在前面.
 func (db *MimaDB) All() (all []*MimaForm) {
-	if len(db.Items)-1 == 0 {
+	if db.Len()-1 == 0 {
 		return nil
 	}
-	for i := len(db.Items) - 1; i > 0; i-- {
+	for i := db.Len() - 1; i > 0; i-- {
 		mima := db.Items[i].ToMimaForm().HidePasswordNotes()
 		if mima.IsDeleted() {
 			continue
@@ -116,10 +125,10 @@ func (db *MimaDB) All() (all []*MimaForm) {
 // DeletedMimas 返回全部被软删除的 Mima, 不包含密码.
 // 删除日期最新(最近)的排在前面.
 func (db *MimaDB) DeletedMimas() (deleted []*MimaForm) {
-	if len(db.Items)-1 == 0 {
+	if db.Len()-1 == 0 {
 		return nil
 	}
-	for i := len(db.Items) - 1; i > 0; i-- {
+	for i := db.Len() - 1; i > 0; i-- {
 		mima := db.Items[i].ToMimaForm().HidePasswordNotes()
 		if !mima.IsDeleted() {
 			continue
@@ -188,7 +197,7 @@ func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
 			return err
 		}
 		if mima.Operation == Insert {
-			db.insertByUpdatedAt(mima)
+			db.Items = append(db.Items, mima)
 			continue
 		}
 
@@ -208,7 +217,7 @@ func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
 			db.insertByUpdatedAt(item)
 		case SoftDelete:
 			item.Delete()
-		case Undelete:
+		case UnDelete:
 			item.Undelete()
 		case DeleteForever:
 			if _, err := db.deleteByID(item.ID); err != nil {
@@ -229,7 +238,7 @@ func (db *MimaDB) rewriteDBFile() error {
 	defer dbFile.Close()
 
 	dbWriter := bufio.NewWriter(dbFile)
-	for i := 0; i < len(db.Items); i++ {
+	for i := 0; i < db.Len(); i++ {
 		mima := db.Items[i]
 		box64, err := mima.Seal(db.key)
 		if err != nil {
@@ -262,7 +271,7 @@ func (db *MimaDB) MakeFirstMima() error {
 	// mima.ID = 0 默认为零
 	mima.Password = key64
 	mima.Notes = randomString()
-	db.Items[0] = mima
+	db.Items = []*Mima{mima}
 	box64, err := mima.Seal(db.key)
 	if err != nil {
 		return err
@@ -284,7 +293,7 @@ func (db *MimaDB) makeKey64() (key64 string, err error) {
 
 // GetByID 凭 id 找 mima. 忽略 id:0. 只有一种错误: 找不到记录.
 func (db *MimaDB) GetByID(id int) (index int, mima *Mima, err error) {
-	for index = 1; index < len(db.Items); index++ {
+	for index = 1; index < db.Len(); index++ {
 		mima = db.Items[index]
 		if mima.ID == id {
 			return
@@ -309,7 +318,7 @@ func (db *MimaDB) GetByAlias(alias string) *Mima {
 	if alias == "" {
 		return nil
 	}
-	for i := 1; i < len(db.Items); i++ {
+	for i := 1; i < db.Len(); i++ {
 		mima := db.Items[i]
 		if mima.IsDeleted() {
 			continue
@@ -383,7 +392,7 @@ func (db *MimaDB) UndeleteByID(id int) (err error) {
 		mima.Alias = ""
 	}
 	mima.Undelete()
-	if err2 := db.sealAndWriteFrag(mima, Undelete); err2 != nil {
+	if err2 := db.sealAndWriteFrag(mima, UnDelete); err2 != nil {
 		return err2
 	}
 	return
@@ -408,33 +417,34 @@ func (db *MimaDB) deleteByID(id int) error {
 }
 
 func (db *MimaDB) isEmpty() bool {
-	if len(db.Items) == 0 {
-		return true
-	}
-	return false
+	return db.Len() == 0
 }
 
 // insertByUpdatedAt 把 mima 插入到适当的位置, 使链表保持有序.
+// 本函数假设 db.Items 已按更新日期从小到大排序, 先找到最大的更新日期, 把 mima 插入其前面.
+/*
 func (db *MimaDB) insertByUpdatedAt(mima *Mima) {
-	if e := db.findUpdatedAfter(mima); e != nil {
-		db.Items.InsertAfter(mima, e)
-	} else {
-		db.Items.PushBack(mima)
+	switch i := db.findUpdatedAfter(mima); {
+	case i == 0:
+		panic("这里 index 不能为零, 因为 id:0 的记录应被避开")
+	case i > 0:
+		db.Items = append(append(db.Items[:i], mima), db.Items[i:]...)
+	case i < 0:
+		db.Items = append(db.Items, mima)
 	}
 }
+*/
 
-// moveByUpdatedAt 把 mima 移动到适当的位置, 使链表保持有序.
-// func (mdb *MimaDB) moveByUpdatedAt(mima *Mima) {
-// 	e := mdb.findUpdatedAfter()
-// }
-
-// findUpdatedAfter 寻找一条记录, 其更新日期小于(早于)参数 mima 的更新日期.
-// 如果找不到则返回 nil, 表示参数 mima 的更新日期是最早(最老)的.
-func (db *MimaDB) findUpdatedBefore(mima *Mima) int {
-	for i := len(db.Items); i > 0; i-- {
+// findUpdatedAfter 寻找一条记录, 其更新日期大于(晚于)参数 mima 的更新日期.
+// 本函数假设 db.Items 已按更新日期从小到大排序.
+// 如果找不到则返回 -1, 表示参数 mima 的更新日期是最大(最新)的.
+/*
+func (db *MimaDB) findUpdatedAfter(mima *Mima) int {
+	for i := 1; i < db.Len(); i++ { // 这里 i != 0, 避开 id:0 的记录.
 		if db.Items[i].UpdatedAt >= mima.UpdatedAt {
-			return e
+			return i
 		}
 	}
-	return nil
+	return -1
 }
+*/
