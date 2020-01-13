@@ -5,12 +5,6 @@ import (
 	"time"
 )
 
-func withPattern(pattern string, fn func(httpRW, httpReq, string)) httpHF {
-	return func(w httpRW, r httpReq) {
-		fn(w, r, pattern)
-	}
-}
-
 func checkState(fn httpHF) httpHF {
 	return func(w httpRW, r httpReq) {
 		if !isLoggedOut() {

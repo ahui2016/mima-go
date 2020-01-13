@@ -6,7 +6,6 @@ package main
 
 import (
 	"bytes"
-	"container/list"
 	"crypto/sha256"
 	"crypto/sha512"
 	"io/ioutil"
@@ -26,6 +25,7 @@ func removeDB() error {
 	return nil
 }
 
+//noinspection NonAsciiCharacters
 func TestMakeFirstMima(t *testing.T) {
 	key := sha256.Sum256([]byte("我是密码"))
 	testDB := NewMimaDB(&key)
@@ -40,10 +40,10 @@ func TestMakeFirstMima(t *testing.T) {
 	}
 
 	// 检查内存中的 mima 是否正确
-	if testDB.Items.Len() != 1 {
-		t.Fatalf("mdb.Items.Len() want: 1, got: %d", testDB.Items.Len())
+	if testDB.Len() != 1 {
+		t.Fatalf("mdb.Items.Len() want: 1, got: %d", testDB.Len())
 	}
-	mima := testDB.Items.Front().Value.(*Mima)
+	mima := testDB.Items[0]
 	if mima == nil {
 		t.Fatal("want a mima, got nil")
 	}
@@ -84,6 +84,8 @@ func TestAddMoreMimas(t *testing.T) {
 	titles := []string{"鹅鹅鹅", "二二二", "六六六"}
 	want := make([]*Mima, len(titles))
 	for i, title := range titles {
+		// 由于数据是按更新时间排序的, 为了使其有明显顺序, 因此明显地使其具有时间间隔.
+		time.Sleep(100 * time.Millisecond)
 		mima, err := newRandomMima(title)
 		if err != nil {
 			t.Fatal(err)
@@ -91,11 +93,10 @@ func TestAddMoreMimas(t *testing.T) {
 		want[i] = mima
 
 		testDB.Lock()
-		testDB.Add(mima)
+		if err := testDB.Add(mima); err != nil {
+			t.Fatal(err)
+		}
 		testDB.Unlock()
-
-		// 由于数据是按更新时间排序的, 为了使其有明显顺序, 因此明显地使其具有时间间隔.
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	fragFiles, err := fragFilePaths()
@@ -120,6 +121,9 @@ func TestAddMoreMimas(t *testing.T) {
 		got = append(got, mima)
 	}
 
+	if got == nil {
+		t.Fatal()
+	}
 	for i := 0; i < len(want); i++ {
 		if !约等于(want[i], got[i]) {
 			t.Fatal("从数据库碎片文件中恢复的 mima 与内存中的 mima 不一致")
@@ -129,7 +133,7 @@ func TestAddMoreMimas(t *testing.T) {
 	// TestOrderOfDB 确认内存数据库中的条目按升序排列 (老数据在前, 新数据在后).
 	t.Run("TestOrderOfDB", func(t *testing.T) {
 		testDB.RLock()
-		mimaSlice := testDB.ToSlice()
+		mimaSlice := testDB.Items
 		testDB.RUnlock()
 
 		for i := 0; i < len(mimaSlice)-1; i++ {
@@ -137,6 +141,7 @@ func TestAddMoreMimas(t *testing.T) {
 			b := mimaSlice[i+1]
 			if a.UpdatedAt >= b.UpdatedAt {
 				t.Logf("id: %d, Title: %s, id: %d, Title: %s", a.ID, a.Title, b.ID, b.Title)
+				t.Logf("a: %s, b: %s", time.Unix(0, a.UpdatedAt), time.Unix(0, b.UpdatedAt))
 				t.Fatalf("第 %d 个元素的更新日期大于或等于第 %d 个", i+1, i+2)
 			}
 		}
@@ -203,7 +208,7 @@ func TestAddMoreMimas(t *testing.T) {
 	testDB.RLock()
 	rebuiltDB.RLock()
 	t.Run("TestReBuiltDB", func(t *testing.T) {
-		if !mimaListEqual(testDB.Items, rebuiltDB.Items) {
+		if !mimaSliceEqual(testDB.Items, rebuiltDB.Items) {
 			t.Fatal("恢复的内存数据库与原数据库不一致")
 		}
 	})
@@ -233,7 +238,7 @@ func TestAddMoreMimas(t *testing.T) {
 
 		testDB.RLock()
 		restoredDB.RLock()
-		if !mimaListEqual(testDB.Items, restoredDB.Items) {
+		if !mimaSliceEqual(testDB.Items, restoredDB.Items) {
 			t.Fatal("数据库文件的内容与原数据库不一致")
 		}
 		restoredDB.RUnlock()
@@ -241,26 +246,19 @@ func TestAddMoreMimas(t *testing.T) {
 	})
 }
 
-// mimaListEqual 判断两个元素类型为 *Mima 的 list 是否相等.
-func mimaListEqual(a, b *list.List) bool {
-	if a.Len() != b.Len() {
-		log.Println("两个 list 的长度不一致")
+// mimaSliceEqual 判断两个元素类型为 *Mima 的 list 是否相等.
+func mimaSliceEqual(a, b []*Mima) bool {
+	if len(a) != len(b) {
+		log.Println("两个 slice 的长度不一致")
 		return false
 	}
-	e1 := a.Front()
-	e2 := b.Front()
-	for {
-		if e1 == nil {
-			break
-		}
-		m1 := e1.Value.(*Mima)
-		m2 := e2.Value.(*Mima)
+	for i := 0; i < len(a); i++ {
+		m1 := a[i]
+		m2 := b[i]
 		if !约等于(m1, m2) {
 			log.Printf("%s 不等于 %s", m1.Title, m2.Title)
 			return false
 		}
-		e1 = e1.Next()
-		e2 = e2.Next()
 	}
 	return true
 }
@@ -289,6 +287,7 @@ func newRandomMima(title string) (*Mima, error) {
 	return mima, nil
 }
 
+//noinspection NonAsciiCharacters
 func 约等于(mima, other *Mima) bool {
 	if mima.Title == other.Title &&
 		mima.Username == other.Username &&

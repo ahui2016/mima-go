@@ -208,7 +208,7 @@ func undeleteHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
-	err := mdb.UndeleteByID(id)
+	err := mdb.UnDeleteByID(id)
 	if errors.Is(err, errAliasExist) {
 		form.Info = err
 		checkErr(w, templates.ExecuteTemplate(w, "edit", form))

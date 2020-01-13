@@ -75,6 +75,7 @@ func filesToBackup(fragFiles []string) []string {
 }
 
 // fragFilePaths 返回数据库碎片文件的完整路径, 并且已排序.
+// 必须确保从小到大排序.
 func fragFilePaths() ([]string, error) {
 	pattern := filepath.Join(dbDirPath, "*"+FragExt)
 	filePaths, err := filepath.Glob(pattern)

@@ -1,7 +1,5 @@
 package main
 
-import ()
-
 // Feedback 用来表示一个普通的表单.
 type Feedback struct {
 	Msg  string

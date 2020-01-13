@@ -138,7 +138,7 @@ func (mima *Mima) IsDeleted() bool {
 }
 
 // UnDelete 把删除时间重置为零.
-func (mima *Mima) Undelete() {
+func (mima *Mima) UnDelete() {
 	mima.DeletedAt = 0
 }
 

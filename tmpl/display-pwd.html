@@ -1,17 +1,17 @@
 {{define "display-pwd"}}
 <script type="text/javascript">
 function generatePW() {
-  var xhr = new XMLHttpRequest()
-  xhr.open('GET', '/api/new-password')
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/new-password');
   xhr.onload = function() {
     if (this.status === 200) {
       document.getElementById('Password').value = this.responseText;
       display_pwd();
     }
-  }
+  };
   xhr.onerror = function() {
     window.alert('出错！获取数据失败。')
-  }
+  };
   xhr.send()
 }
 

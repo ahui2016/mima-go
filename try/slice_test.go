@@ -10,10 +10,6 @@ type SliceInside struct {
 	List  *list.List
 }
 
-func NewSliceInSide() (s *SliceInside) {
-	return
-}
-
 func TestSliceInStruct(t *testing.T) {
 	s := new(SliceInside)
 	// s := NewSliceInSide() // 不行, 需要初始化.

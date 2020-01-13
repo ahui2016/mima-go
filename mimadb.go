@@ -66,9 +66,9 @@ func (db *MimaDB) Len() int {
 	return len(db.Items)
 }
 
-func (db *MimaDB) lastIndex() int {
-	return db.Len() - 1
-}
+//func (db *MimaDB) lastIndex() int {
+//	return db.Len() - 1
+//}
 
 // Rebuild 填充内存数据库，读取数据库碎片, 整合到数据库文件中.
 // 每次启动程序, 初始化时, 如果已有账号, 自动执行一次 Rebuild.
@@ -156,6 +156,7 @@ func (db *MimaDB) scanDBtoMemory() error {
 	if err != nil {
 		return err
 	}
+	//noinspection GoUnhandledErrorResult
 	defer file.Close()
 
 	for scanner.Scan() {
@@ -191,6 +192,9 @@ func (db *MimaDB) SetKeyFromSlice(slice []byte) {
 // readFragFilesAndUpdate 读取数据库碎片文件, 并根据其内容更新内存数据库.
 // 分为 新增, 更新, 软删除, 彻底删除 四种情形.
 func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
+	if !sort.StringsAreSorted(filePaths) {
+		return errors.New("filePaths 必须从小到大排序")
+	}
 	for _, f := range filePaths {
 		mima, err := readAndDecrypt(f, db.key)
 		if err != nil {
@@ -201,7 +205,7 @@ func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
 			continue
 		}
 
-		_, item, err := db.GetByID(mima.ID)
+		i, item, err := db.GetByID(mima.ID)
 		if err != nil {
 			return err
 		}
@@ -210,17 +214,14 @@ func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
 		case Insert: // 上面已操作, 这里不需要再操作.
 		case Update:
 			item.UpdateFromFrag(mima)
-			_, err := db.deleteByID(item.ID)
-			if err != nil {
-				return err
-			}
-			db.insertByUpdatedAt(item)
+			db.Items = append(db.Items, item)
+			db.Items = append(db.Items[:i], db.Items[i+1:]...)
 		case SoftDelete:
 			item.Delete()
 		case UnDelete:
-			item.Undelete()
+			item.UnDelete()
 		case DeleteForever:
-			if _, err := db.deleteByID(item.ID); err != nil {
+			if err := db.deleteByID(item.ID); err != nil {
 				return err
 			}
 		default: // 一共 5 种 Operation 已在上面全部处理, 没有其他可能.
@@ -235,6 +236,7 @@ func (db *MimaDB) rewriteDBFile() error {
 	if err != nil {
 		return err
 	}
+	//noinspection GoUnhandledErrorResult
 	defer dbFile.Close()
 
 	dbWriter := bufio.NewWriter(dbFile)
@@ -380,18 +382,18 @@ func (db *MimaDB) TrashByID(id int) error {
 	return db.sealAndWriteFrag(mima, SoftDelete)
 }
 
-// UndeleteByID 从回收站中还原一个 mima (DeletedAt 重置为零), 并生成一块数据库碎片.
+// UnDeleteByID 从回收站中还原一个 mima (DeletedAt 重置为零), 并生成一块数据库碎片.
 // 此时, 需要判断 Alias 有无冲突, 如有冲突则清空本条记录的 Alias.
-func (db *MimaDB) UndeleteByID(id int) (err error) {
+func (db *MimaDB) UnDeleteByID(id int) (err error) {
 	_, mima, err := db.GetByID(id)
 	if err != nil {
 		return err
 	}
 	if db.IsAliasExist(mima.Alias) {
-		err = fmt.Errorf("%w: %s, 因此此记录的 alias 已被清空", errAliasExist, mima.Alias)
+		err = fmt.Errorf("%w: %s, 因此该记录的 alias 已被清空", errAliasExist, mima.Alias)
 		mima.Alias = ""
 	}
-	mima.Undelete()
+	mima.UnDelete()
 	if err2 := db.sealAndWriteFrag(mima, UnDelete); err2 != nil {
 		return err2
 	}
@@ -406,7 +408,8 @@ func (db *MimaDB) IsAliasExist(alias string) (ok bool) {
 	return
 }
 
-// deleteByID 删除内存数据库中的指定条目.
+// deleteByID 删除内存数据库中的指定记录, 不生成数据库碎片.
+// 用于 ReBuild 时根据数据库碎片删除记录.
 func (db *MimaDB) deleteByID(id int) error {
 	i, _, err := db.GetByID(id)
 	if err != nil {
