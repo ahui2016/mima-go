@@ -18,11 +18,11 @@ const (
 
 	tmplDir = "tmpl"
 	DBDir   = "mimadb"
-	DBName  = "mima.mdb"
+	DBName  = "mima.db"
 	TempDir = "temp_dir_for_test"
 
 	// 数据库碎片文件的后缀名
-	FragExt = ".mdb.frag"
+	FragExt = ".db.frag"
 
 	// 数据库备份文件的后缀名
 	tarballExt = ".tar.gz"
@@ -40,6 +40,7 @@ var (
 	dbFileNotFound error
 	errAliasExist  error
 	errNeedTitle   error
+	errMimaDeleted error
 )
 
 // Nonce 是 [NonceSize]byte 的别名.
@@ -58,7 +59,8 @@ func init() {
 
 	dbFileNotFound = errors.New("找不到数据库文件")
 	errAliasExist = errors.New("该 alias 已存在")
-	errNeedTitle = errors.New("Title 标题长度必须大于零")
+	errNeedTitle = errors.New("'Title' 长度不可为零, 请填写 Title")
+	errMimaDeleted = errors.New("此记录已被删除")
 }
 
 func getBaseDir() string {

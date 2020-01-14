@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -63,6 +62,11 @@ func createAccount(w httpRW, r httpReq) {
 }
 
 func loginHandler(w httpRW, r httpReq) {
+	if dbFileIsNotExist() {
+		// 数据库不存在, 需要创建新账号.
+		checkErr(w, templates.ExecuteTemplate(w, "create-account", nil))
+		return
+	}
 	if !isLoggedOut() {
 		err := &Feedback{Err: errors.New("已登入, 不可重复登入")}
 		checkErr(w, templates.ExecuteTemplate(w, "login", err))
@@ -83,7 +87,7 @@ func loginHandler(w httpRW, r httpReq) {
 	http.Redirect(w, r, "/home/", http.StatusFound)
 }
 
-func logoutHandler(w httpRW, r httpReq) {
+func logoutHandler(w httpRW, _ httpReq) {
 	logout()
 	msg := &Feedback{Msg: "已登出, 请重新登入"}
 	checkErr(w, templates.ExecuteTemplate(w, "login", msg))
@@ -93,11 +97,11 @@ func homeHandler(w httpRW, r httpReq) {
 	http.Redirect(w, r, "/index/", http.StatusFound)
 }
 
-func indexHandler(w httpRW, r httpReq) {
+func indexHandler(w httpRW, _ httpReq) {
 	checkErr(w, templates.ExecuteTemplate(w, "index", mdb.All()))
 }
 
-func recyclebin(w httpRW, r httpReq) {
+func recyclebin(w httpRW, _ httpReq) {
 	checkErr(w, templates.ExecuteTemplate(w, "recyclebin", mdb.DeletedMimas()))
 }
 
@@ -133,7 +137,7 @@ func editHandler(w httpRW, r httpReq) {
 	if r.Method != http.MethodPost {
 		form = mdb.GetFormByID(id)
 		if form.IsDeleted() {
-			form = &MimaForm{Err: errors.New("此记录已被删除, 不可编辑")}
+			form = &MimaForm{Err: errMimaDeleted}
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
 		return
@@ -146,22 +150,17 @@ func editHandler(w httpRW, r httpReq) {
 		Password: r.FormValue("Password"),
 		Notes:    strings.TrimSpace(r.FormValue("Notes")),
 	}
-	// if err := mdb.Update(form); err != nil {
-	// 	form.Err = err
-	// 	checkErr(w, templates.ExecuteTemplate(w, "edit", form))
-	// 	return
-	// }
-}
 
-func getAndCheckID(w httpRW, r httpReq, tmpl string, form *MimaForm) (id int, ok bool) {
-	id, err := strconv.Atoi(r.FormValue("id"))
-	if err != nil {
-		form.Err = err
-		checkErr(w, templates.ExecuteTemplate(w, tmpl, form))
+	if form.Err = mdb.Update(form); form.Err != nil {
+		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
 		return
 	}
-	if id <= 0 || id >= mdb.NextID {
-		form.Err = fmt.Errorf("id: %d out of range", id)
+	http.Redirect(w, r, "/home/", http.StatusFound)
+}
+
+func getAndCheckID(w httpRW, r httpReq, tmpl string, form *MimaForm) (id string, ok bool) {
+	if id = strings.TrimSpace(r.FormValue("id")); id == "" {
+		form.Err = fmt.Errorf("id 不可为空")
 		checkErr(w, templates.ExecuteTemplate(w, tmpl, form))
 		return
 	}
@@ -177,7 +176,7 @@ func deleteHandler(w httpRW, r httpReq) {
 	if r.Method != http.MethodPost {
 		form = mdb.GetFormByID(id)
 		if form.IsDeleted() {
-			form.Err = errors.New("此记录已被删除, 不可重复删除")
+			form = &MimaForm{Err: errMimaDeleted}
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "delete", form))
 		return
@@ -209,31 +208,28 @@ func undeleteHandler(w httpRW, r httpReq) {
 		return
 	}
 	err := mdb.UnDeleteByID(id)
-	if errors.Is(err, errAliasExist) {
-		form.Info = err
-		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
-		return
-	}
-	if err != nil {
+	if err != nil && !errors.Is(err, errAliasExist) {
 		form.Err = err
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
+	form.Info = err // errors.Is(err, errAliasExist)
+	checkErr(w, templates.ExecuteTemplate(w, "edit", form))
 }
 
-func newPassword(w httpRW, r httpReq) {
+func newPassword(w httpRW, _ httpReq) {
 	pwBytes := make([]byte, passwordSize)
 	if _, err := rand.Read(pwBytes); err != nil {
-		fmt.Fprint(w, err)
+		_, _ = fmt.Fprint(w, err)
 	}
 	pw := base64.RawURLEncoding.EncodeToString(pwBytes)[:passwordSize]
-	fmt.Fprint(w, pw)
+	_, _ = fmt.Fprint(w, pw)
 }
 
 func checkErr(w httpRW, err error) {
 	if err != nil {
 		log.Println(err)
-		fmt.Fprintf(w, "%v", err)
+		_, _ = fmt.Fprintf(w, "%v", err)
 	}
 }
 

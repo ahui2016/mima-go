@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/nacl/secretbox"
 	"os"
 	"sort"
 	"strings"
@@ -34,13 +33,11 @@ const (
 type MimaDB struct {
 	sync.RWMutex
 
-	// 主要用于 MimaDB.Add 中
-	NextID int
-
 	// 原始数据, 按 UpdatedAt 排序, 最新(最近)的在后面.
 	Items []*Mima
 
 	key       SecretKey
+	userKey   SecretKey
 	StartedAt time.Time
 	Period    time.Duration
 }
@@ -53,9 +50,8 @@ func NewMimaDB(key SecretKey) *MimaDB {
 		panic("缺少key, 需要key")
 	}
 	return &MimaDB{
-		NextID:    1, // 编号从 1 开始, 第 0 条记录特殊处理.
 		Items:     []*Mima{},
-		key:       key,
+		userKey:   key,
 		StartedAt: time.Now(),
 		Period:    time.Minute * 5,
 	}
@@ -160,33 +156,34 @@ func (db *MimaDB) scanDBtoMemory() error {
 	defer file.Close()
 
 	for scanner.Scan() {
-		box64 := scanner.Text()
-		mima, err := DecryptToMima(box64, db.key)
-		if err != nil {
-			return fmt.Errorf("id: %d, 在初始化阶段解密失败: %w", db.NextID, err)
-		}
-		mima.Operation = 0
-		mima.ID = db.NextID
-		db.NextID++
-		db.Items = append(db.Items, mima)
-		if mima.ID == 0 {
-			key, err := base64.StdEncoding.DecodeString(mima.Password)
-			if err != nil {
+		var (
+			mima *Mima
+			err  error
+			key []byte
+			box64 = scanner.Text()
+		)
+		if db.key == nil {
+			if mima, err = DecryptToMima(box64, db.userKey); err != nil {
+				return fmt.Errorf("用户密码错误: %w", err)
+			}
+			if key, err = base64.StdEncoding.DecodeString(mima.Password); err != nil {
 				return err
 			}
 			db.SetKeyFromSlice(key)
+		} else {
+			if mima, err = DecryptToMima(box64, db.key); err != nil {
+				return fmt.Errorf("用户密码正确, 但内部密码错误: %w", err)
+			}
 		}
+		db.Items = append(db.Items, mima)
 	}
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-	return nil
+	return scanner.Err()
 }
 
 func (db *MimaDB) SetKeyFromSlice(slice []byte) {
-	var secretKey [KeySize]byte
-	copy(secretKey[:], slice)
-	db.key = &secretKey
+	var masterKey [KeySize]byte
+	copy(masterKey[:], slice)
+	db.key = &masterKey
 }
 
 // readFragFilesAndUpdate 读取数据库碎片文件, 并根据其内容更新内存数据库.
@@ -200,6 +197,7 @@ func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
 		if err != nil {
 			return err
 		}
+
 		if mima.Operation == Insert {
 			db.Items = append(db.Items, mima)
 			continue
@@ -241,8 +239,14 @@ func (db *MimaDB) rewriteDBFile() error {
 
 	dbWriter := bufio.NewWriter(dbFile)
 	for i := 0; i < db.Len(); i++ {
+		var key SecretKey
+		if i == 0 {
+			key = db.userKey
+		} else {
+			key = db.key
+		}
 		mima := db.Items[i]
-		box64, err := mima.Seal(db.key)
+		box64, err := mima.Seal(key)
 		if err != nil {
 			return err
 		}
@@ -257,6 +261,7 @@ func (db *MimaDB) rewriteDBFile() error {
 }
 
 // MakeFirstMima 生成第一条记录, 用于保存密码.
+// 第一条记录的 ID 特殊处理, 手动设置为空字符串.
 // 同时会生成数据库文件 mimadb/mima.mdb
 func (db *MimaDB) MakeFirstMima() error {
 	if !dbFileIsNotExist() {
@@ -266,48 +271,41 @@ func (db *MimaDB) MakeFirstMima() error {
 	if err != nil {
 		return err
 	}
-	key64, err := db.makeKey64()
-	if err != nil {
-		return err
-	}
-	// mima.ID = 0 默认为零
-	mima.Password = key64
+	key := db.newMasterKey()
+	db.SetKeyFromSlice(key)
+	mima.ID = ""
+	mima.Password = base64.StdEncoding.EncodeToString(key)
 	mima.Notes = randomString()
 	db.Items = []*Mima{mima}
-	box64, err := mima.Seal(db.key)
+	box64, err := mima.Seal(db.userKey) // 第一条记录特殊处理, 用 userKey 加密.
 	if err != nil {
 		return err
 	}
 	return writeFile(dbFullPath, box64)
 }
 
-func (db *MimaDB) makeKey64() (key64 string, err error) {
+// newMasterKey 生成 master key, 由于需要保存在 Mima.Password 里, 因此采用 base64.
+func (db *MimaDB) newMasterKey() []byte {
 	password := randomString()
 	key := sha256.Sum256([]byte(password))
-	nonce, err := newNonce()
-	if err != nil {
-		return
-	}
-	box := secretbox.Seal(nonce[:], key[:], &nonce, db.key)
-	key64 = base64.StdEncoding.EncodeToString(box)
-	return
+	return key[:]
 }
 
 // GetByID 凭 id 找 mima. 忽略 id:0. 只有一种错误: 找不到记录.
-func (db *MimaDB) GetByID(id int) (index int, mima *Mima, err error) {
+func (db *MimaDB) GetByID(id string) (index int, mima *Mima, err error) {
 	for index = 1; index < db.Len(); index++ {
 		mima = db.Items[index]
 		if mima.ID == id {
 			return
 		}
 	}
-	err = fmt.Errorf("NotFound: 找不到 id: %d 的记录", id)
+	err = fmt.Errorf("NotFound: 找不到 id: %s 的记录", id)
 	return
 }
 
 // GetFormByID 凭 id 找 mima 并转换为 MimaForm. 忽略 id:0.
 // 只有一种错误: 找不到记录, 并且该错误信息已内嵌到 MimaForm 中.
-func (db *MimaDB) GetFormByID(id int) *MimaForm {
+func (db *MimaDB) GetFormByID(id string) *MimaForm {
 	_, mima, err := db.GetByID(id)
 	if err != nil {
 		return &MimaForm{Err: err}
@@ -340,28 +338,29 @@ func (db *MimaDB) Add(mima *Mima) error {
 	if len(mima.Title) == 0 {
 		return errNeedTitle
 	}
-	mima.ID = db.NextID
-	db.NextID++
 	db.Items = append(db.Items, mima)
 	return db.sealAndWriteFrag(mima, Insert)
 }
 
 // Update 根据 MimaForm 更新对应的 Mima 内容, 并生成一块数据库碎片.
-// func (mdb *MimaDB) Update(form *MimaForm) error {
-// 	if len(form.Title) == 0 {
-// 		return errNeedTitle
-// 	}
-// 	if mdb.IsAliasExist(form.Alias) {
-// 		return errAliasExist
-// 	}
-// 	e, mima, err := mdb.GetElemAndMima(form.ID)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	mima.UpdateFromForm(form)
-// 	mdb.insertByUpdatedAt(mima)
-// 	return mdb.sealAndWriteFrag(mima, Update)
-// }
+func (db *MimaDB) Update(form *MimaForm) error {
+	if len(form.Title) == 0 {
+		return errNeedTitle
+	}
+	if db.IsAliasExist(form.Alias) {
+		return errAliasExist
+	}
+	i, mima, err := db.GetByID(form.ID)
+	if err != nil {
+		return err
+	}
+	if mima.UpdateFromForm(form) {
+		// 如果实际上未发生更新, 则不需要移动元素.
+		db.Items = append(db.Items, mima)
+		db.Items = append(db.Items[:i], db.Items[i+1:]...)
+	}
+	return mdb.sealAndWriteFrag(mima, Update)
+}
 
 func (db *MimaDB) sealAndWriteFrag(mima *Mima, op Operation) error {
 	mima.Operation = op
@@ -373,7 +372,7 @@ func (db *MimaDB) sealAndWriteFrag(mima *Mima, op Operation) error {
 }
 
 // TrashByID 软删除一个 mima, 并生成一块数据库碎片.
-func (db *MimaDB) TrashByID(id int) error {
+func (db *MimaDB) TrashByID(id string) error {
 	_, mima, err := db.GetByID(id)
 	if err != nil {
 		return err
@@ -384,7 +383,7 @@ func (db *MimaDB) TrashByID(id int) error {
 
 // UnDeleteByID 从回收站中还原一个 mima (DeletedAt 重置为零), 并生成一块数据库碎片.
 // 此时, 需要判断 Alias 有无冲突, 如有冲突则清空本条记录的 Alias.
-func (db *MimaDB) UnDeleteByID(id int) (err error) {
+func (db *MimaDB) UnDeleteByID(id string) (err error) {
 	_, mima, err := db.GetByID(id)
 	if err != nil {
 		return err
@@ -410,7 +409,7 @@ func (db *MimaDB) IsAliasExist(alias string) (ok bool) {
 
 // deleteByID 删除内存数据库中的指定记录, 不生成数据库碎片.
 // 用于 ReBuild 时根据数据库碎片删除记录.
-func (db *MimaDB) deleteByID(id int) error {
+func (db *MimaDB) deleteByID(id string) error {
 	i, _, err := db.GetByID(id)
 	if err != nil {
 		return err

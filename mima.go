@@ -1,9 +1,12 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"math/big"
+	"strconv"
 	"time"
 
 	"golang.org/x/crypto/nacl/secretbox"
@@ -14,7 +17,7 @@ import (
 type Mima struct {
 
 	// (主键) (必须) (唯一) (自增)
-	ID int
+	ID string
 
 	// 标题 (必须)
 	// 第一条记录的 Title 长度为零, 其他记录要求 Title 长度大于零.
@@ -51,11 +54,28 @@ func NewMima(title string) (*Mima, error) {
 		return nil, err
 	}
 	mima := new(Mima)
+	if mima.ID, err = newID(); err != nil {
+		return nil, err
+	}
 	mima.Title = title
 	mima.Nonce = nonce
 	mima.CreatedAt = time.Now().UnixNano()
 	mima.UpdatedAt = mima.CreatedAt
 	return mima, nil
+}
+
+// newID 返回一个由时间戳和随机数组成的 id, 经测试瞬间生成一万个 id 不会重复.
+// 由于时间戳的精度为秒, 因此如果两次生成 id 之间超过一秒, 则绝对不会重复.
+func newID() (id string, err error) {
+	var max int64 = 100_000_000
+	n, err := rand.Int(rand.Reader, big.NewInt(max))
+	if err != nil {
+		return
+	}
+	timestamp := time.Now().Unix()
+	idInt64 := timestamp*max + n.Int64()
+	id = strconv.FormatInt(idInt64, 36)
+	return
 }
 
 // NewMimaFromForm 根据 form 的信息生成一个新的 mima.
@@ -104,16 +124,30 @@ func (mima *Mima) UpdateFromFrag(fragment *Mima) {
 }
 
 // UpdateFromForm 以前端传回来的 MimaForm 为准, 更新内存中的条目内容.
-func (mima *Mima) UpdateFromForm(form *MimaForm) {
+// 如果不需要更新则返回 false.
+// 如果只有 Alias 发生改变, 则改变 Alias, 但不生成历史记录, 也不移动元素.
+func (mima *Mima) UpdateFromForm(form *MimaForm) bool {
+	mima.Alias = form.Alias
+	if mima.equalToForm(form) {
+		return false
+	}
 	updatedAt := time.Now().UnixNano()
 	mima.makeHistory(updatedAt)
 
 	mima.Title = form.Title
-	mima.Alias = form.Alias
 	mima.Username = form.Username
 	mima.Password = form.Password
 	mima.Notes = form.Notes
 	mima.UpdatedAt = updatedAt
+	return true
+}
+
+// equalToForm 用于检查 mima 是否需要更新.
+// 如果返回 true 则表示不需要更新.
+func (mima *Mima) equalToForm(form *MimaForm) bool {
+	s1 := mima.Title + mima.Username + mima.Password + mima.Notes
+	s2 := form.Title + form.Username + form.Password + form.Notes
+	return s1 == s2
 }
 
 func (mima *Mima) makeHistory(updatedAt int64) {

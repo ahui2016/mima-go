@@ -1,5 +1,7 @@
 # Todo
 
+- ID 不再使用自增, 改为 timestamp (短) + 三位随机数.
+
 - 当且只当 Operation.Update 的时候才需要使用 MimaDB.findUpdatedAfter,
   完全不需要用到 insertByUpdatedAt ?
   - 不对, findUpdatedAfter 也不需要使用
@@ -41,6 +43,11 @@
 - 前端与后端之间相互沟通, 需要指定每一条记录的 ID
 - Nonce 是二进制数据, 转换为 base64 也很长, 不适合用来做 ID
 - 因此采用自增 ID (uint)
+- 自增 ID 难以维护 (需要找一个地方存放 max id), 因此不再使用自增 ID
+- 改用 timestamp (短) + [0,100_000_000) 的随机数 (crypto), 再转为 36 进制以缩短字符串长度
+  - 经测试, 瞬间生成 10000 个 id 不会重复
+  - 由于时间戳的精度为秒, 因此如果两次生成 id 之间超过一秒, 更是绝对不会重复
+- 修改代码时发现, 不用自己维护自增 ID, 确实更方便.
 
 ## 数据库碎片
 

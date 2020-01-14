@@ -112,14 +112,16 @@ func TestAddMoreMimas(t *testing.T) {
 		}
 	})
 
+	testDB.RLock()
 	var got []*Mima
 	for _, f := range fragFiles {
-		mima, err := readAndDecrypt(f, &key)
+		mima, err := readAndDecrypt(f, testDB.key)
 		if err != nil {
 			t.Fatalf("%v: %s", err, f)
 		}
 		got = append(got, mima)
 	}
+	testDB.RUnlock()
 
 	if got == nil {
 		t.Fatal()
@@ -140,7 +142,7 @@ func TestAddMoreMimas(t *testing.T) {
 			a := mimaSlice[i]
 			b := mimaSlice[i+1]
 			if a.UpdatedAt >= b.UpdatedAt {
-				t.Logf("id: %d, Title: %s, id: %d, Title: %s", a.ID, a.Title, b.ID, b.Title)
+				t.Logf("id: %s, Title: %s, id: %s, Title: %s", a.ID, a.Title, b.ID, b.Title)
 				t.Logf("a: %s, b: %s", time.Unix(0, a.UpdatedAt), time.Unix(0, b.UpdatedAt))
 				t.Fatalf("第 %d 个元素的更新日期大于或等于第 %d 个", i+1, i+2)
 			}

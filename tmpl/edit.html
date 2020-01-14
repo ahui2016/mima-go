@@ -1,5 +1,6 @@
 {{define "edit"}}
 {{template "top"}}
+{{template "display-pwd"}}
 
 <p><a href="/home">mima-go</a> .. Edit</p>
 
@@ -24,7 +25,7 @@
     <input type="text" name="Title" id="Title" class="Fields" autofocus required
            value="{{.Title}}" onblur="this.value = this.value.trim()" />
   <label for="Alias">Alias:</label>
-    <input type="text" name="Alias" id="Alias" class="Fields" autofocus required
+    <input type="text" name="Alias" id="Alias" class="Fields"
           value="{{.Alias}}" onblur="this.value = this.value.trim()" />
   <label for="Username">Username:</label>
     <input type="text" name="Username" id="Username" class="Fields"
@@ -40,9 +41,10 @@
     <input type="submit" value="Submit" />
   </p>
 </form>
+<script type="text/javascript">
+  display_pwd()
+</script>
 {{end}}
-
-{{template "display-pwd"}}
 
 {{template "bottom"}}
 {{end}}

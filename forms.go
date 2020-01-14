@@ -9,7 +9,7 @@ type Feedback struct {
 
 // MimaForm 用来表示一个 Mima, 但只包含一部分信息.
 type MimaForm struct {
-	ID        int
+	ID        string
 	Title     string
 	Alias     string
 	Username  string
