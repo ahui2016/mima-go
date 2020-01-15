@@ -113,23 +113,30 @@ func DecryptToMima(box64 string, key SecretKey) (*Mima, error) {
 }
 
 // UpdateFromFrag 以数据库碎片中的内容为准, 更新内存中的条目.
-func (mima *Mima) UpdateFromFrag(fragment *Mima) {
+func (mima *Mima) UpdateFromFrag(fragment *Mima) (needChangeIndex bool) {
+	if mima.UpdatedAt == fragment.UpdatedAt {
+		// 更新日期没有变化, 但生成了数据库碎片, 即有且只有 Alias 发生了更改.
+		mima.Alias = fragment.Alias
+		return false
+	}
 	mima.Title = fragment.Title
-	mima.Alias = fragment.Alias
 	mima.Username = fragment.Username
 	mima.Password = fragment.Password
 	mima.Notes = fragment.Notes
 	mima.UpdatedAt = fragment.UpdatedAt
 	mima.HistoryItems = fragment.HistoryItems
+	return true
 }
 
 // UpdateFromForm 以前端传回来的 MimaForm 为准, 更新内存中的条目内容.
-// 如果不需要更新则返回 false.
 // 如果只有 Alias 发生改变, 则改变 Alias, 但不生成历史记录, 也不移动元素.
-func (mima *Mima) UpdateFromForm(form *MimaForm) bool {
-	mima.Alias = form.Alias
+func (mima *Mima) UpdateFromForm(form *MimaForm) (needChangeIndex bool, needWriteFrag bool) {
+	if mima.Alias != form.Alias {
+		mima.Alias = form.Alias
+		needWriteFrag = true
+	}
 	if mima.equalToForm(form) {
-		return false
+		return false, needWriteFrag
 	}
 	updatedAt := time.Now().UnixNano()
 	mima.makeHistory(updatedAt)
@@ -139,11 +146,12 @@ func (mima *Mima) UpdateFromForm(form *MimaForm) bool {
 	mima.Password = form.Password
 	mima.Notes = form.Notes
 	mima.UpdatedAt = updatedAt
-	return true
+	return true, true
 }
 
-// equalToForm 用于检查 mima 是否需要更新.
-// 如果返回 true 则表示不需要更新.
+// equalToForm 用于检查 mima 与 form 的内容是否需要基本相等.
+// 如果基本相等则返回 true.
+// 注意本函数不检查 Alias.
 func (mima *Mima) equalToForm(form *MimaForm) bool {
 	s1 := mima.Title + mima.Username + mima.Password + mima.Notes
 	s2 := form.Title + form.Username + form.Password + form.Notes

@@ -106,7 +106,7 @@ func (db *MimaDB) Rebuild() (tarballFile string, err error) {
 // 并且, 不包含密码和备注. 另外, 更新时间最新(最近)的排在前面.
 func (db *MimaDB) All() (all []*MimaForm) {
 	if db.Len()-1 == 0 {
-		return nil
+		return
 	}
 	for i := db.Len() - 1; i > 0; i-- {
 		mima := db.Items[i].ToMimaForm().HidePasswordNotes()
@@ -193,33 +193,35 @@ func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
 		return errors.New("filePaths 必须从小到大排序")
 	}
 	for _, f := range filePaths {
-		mima, err := readAndDecrypt(f, db.key)
+		frag, err := readAndDecrypt(f, db.key)
 		if err != nil {
 			return err
 		}
 
-		if mima.Operation == Insert {
-			db.Items = append(db.Items, mima)
+		if frag.Operation == Insert {
+			db.Items = append(db.Items, frag)
 			continue
 		}
 
-		i, item, err := db.GetByID(mima.ID)
+		i, mima, err := db.GetByID(frag.ID)
 		if err != nil {
 			return err
 		}
 
-		switch mima.Operation {
+		switch frag.Operation {
 		case Insert: // 上面已操作, 这里不需要再操作.
 		case Update:
-			item.UpdateFromFrag(mima)
-			db.Items = append(db.Items, item)
-			db.Items = append(db.Items[:i], db.Items[i+1:]...)
+			if mima.UpdateFromFrag(frag) {
+				db.Items = append(db.Items, mima)
+				db.Items = append(db.Items[:i], db.Items[i+1:]...)
+			}
 		case SoftDelete:
-			item.Delete()
+			mima.Delete()
 		case UnDelete:
-			item.UnDelete()
+			mima.Alias = frag.Alias
+			mima.UnDelete()
 		case DeleteForever:
-			if err := db.deleteByID(item.ID); err != nil {
+			if err := db.deleteByID(mima.ID); err != nil {
 				return err
 			}
 		default: // 一共 5 种 Operation 已在上面全部处理, 没有其他可能.
@@ -343,23 +345,26 @@ func (db *MimaDB) Add(mima *Mima) error {
 }
 
 // Update 根据 MimaForm 更新对应的 Mima 内容, 并生成一块数据库碎片.
-func (db *MimaDB) Update(form *MimaForm) error {
+func (db *MimaDB) Update(form *MimaForm) (err error) {
 	if len(form.Title) == 0 {
 		return errNeedTitle
 	}
-	if db.IsAliasExist(form.Alias) {
-		return errAliasExist
+	if db.IsAliasConflicts(form.Alias, form.ID) {
+		return errAliasConflicts
 	}
 	i, mima, err := db.GetByID(form.ID)
 	if err != nil {
 		return err
 	}
-	if mima.UpdateFromForm(form) {
-		// 如果实际上未发生更新, 则不需要移动元素.
+	needChangeIndex, needWriteFrag := mima.UpdateFromForm(form)
+	if needChangeIndex {
 		db.Items = append(db.Items, mima)
 		db.Items = append(db.Items[:i], db.Items[i+1:]...)
 	}
-	return mdb.sealAndWriteFrag(mima, Update)
+	if needWriteFrag {
+		err = mdb.sealAndWriteFrag(mima, Update)
+	}
+	return
 }
 
 func (db *MimaDB) sealAndWriteFrag(mima *Mima, op Operation) error {
@@ -388,8 +393,8 @@ func (db *MimaDB) UnDeleteByID(id string) (err error) {
 	if err != nil {
 		return err
 	}
-	if db.IsAliasExist(mima.Alias) {
-		err = fmt.Errorf("%w: %s, 因此该记录的 alias 已被清空", errAliasExist, mima.Alias)
+	if db.IsAliasConflicts(mima.Alias, id) {
+		err = fmt.Errorf("%w: %s, 因此该记录的 alias 已被清空", errAliasConflicts, mima.Alias)
 		mima.Alias = ""
 	}
 	mima.UnDelete()
@@ -399,12 +404,14 @@ func (db *MimaDB) UnDeleteByID(id string) (err error) {
 	return
 }
 
-// IsAliasExist 判断 alias 有无冲突.
-func (db *MimaDB) IsAliasExist(alias string) (ok bool) {
-	if m := db.GetByAlias(alias); m != nil {
-		ok = true
+// IsAliasConflicts 判断 alias 有无冲突.
+// 由于在设计上规定新增记录时不可编辑 alias, 只有在 edit 页面才能编辑 alias,
+// 因此必然有一个本记录的 ID, 在判断冲突时应被排除在外.
+func (db *MimaDB) IsAliasConflicts(alias string, excludedID string) (yes bool) {
+	if m := db.GetByAlias(alias); m != nil && m.ID != excludedID {
+		return true // Yes, conflicts.
 	}
-	return
+	return false // No, does not conflict.
 }
 
 // deleteByID 删除内存数据库中的指定记录, 不生成数据库碎片.

@@ -37,10 +37,10 @@ var (
 
 	mdb *MimaDB
 
-	dbFileNotFound error
-	errAliasExist  error
-	errNeedTitle   error
-	errMimaDeleted error
+	dbFileNotFound    error
+	errAliasConflicts error
+	errNeedTitle      error
+	errMimaDeleted    error
 )
 
 // Nonce 是 [NonceSize]byte 的别名.
@@ -58,7 +58,7 @@ func init() {
 	templates = template.Must(template.ParseGlob(filepath.Join(tmplDirPath, "*.html")))
 
 	dbFileNotFound = errors.New("找不到数据库文件")
-	errAliasExist = errors.New("该 alias 已存在")
+	errAliasConflicts = errors.New("该 alias 已存在")
 	errNeedTitle = errors.New("'Title' 长度不可为零, 请填写 Title")
 	errMimaDeleted = errors.New("此记录已被删除")
 }

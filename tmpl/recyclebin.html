@@ -15,10 +15,10 @@
               <a id="delete" href="/delete-forever?id={{.ID}}">delete</a>
             </span><br />
             <span class="Deleted" style="font-size:x-small;color:grey">deleted at {{.DeletedAt}}</span><br />
-            {{if .Alias}}Alias: {{.Alias}}<br/>{{end}}
-            {{if .Username}}Username: {{.Username}}<br />{{end}}
+            {{if .Alias}}[{{.Alias}}]{{end}}
+            {{if .Username}}{{.Username}}<br />{{end}}
             {{if .Notes}}Notes: {{.Notes}}{{end}}
-        </p>    
+        </p>
     </li>
     {{ else }}
     <li>没有垃圾。</li>

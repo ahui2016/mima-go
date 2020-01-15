@@ -197,23 +197,28 @@ func undeleteHandler(w httpRW, r httpReq) {
 	}
 	form = mdb.GetFormByID(id)
 	if !form.IsDeleted() {
-		form.Err = errors.New("此记录不在回收站中")
+		form := &MimaForm{Err: errors.New("此记录不在回收站中")}
+		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
+		return
 	}
 	if r.Method != http.MethodPost {
-		if mdb.IsAliasExist(form.Alias) {
+		if mdb.IsAliasConflicts(form.Alias, id) {
 			form.Info = fmt.Errorf(
-				"%w: %s, 如果确认还原此记录, 该 alias 将被清空", errAliasExist, form.Alias)
+				"%w: %s, 如果确认还原此记录, 该 alias 将被清空", errAliasConflicts, form.Alias)
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
 	err := mdb.UnDeleteByID(id)
-	if err != nil && !errors.Is(err, errAliasExist) {
-		form.Err = err
+	if err != nil && !errors.Is(err, errAliasConflicts) {
+		form = &MimaForm{Err: err}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
-	form.Info = err // errors.Is(err, errAliasExist)
+	if errors.Is(err, errAliasConflicts) {
+		form.Info = err
+		form.Alias = ""
+	}
 	checkErr(w, templates.ExecuteTemplate(w, "edit", form))
 }
 
