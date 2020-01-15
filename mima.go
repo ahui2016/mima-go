@@ -44,7 +44,7 @@ type Mima struct {
 	Operation Operation
 
 	// 修改历史
-	HistoryItems []History
+	History []*History
 }
 
 // NewMima 生成一个新的 mima.
@@ -124,7 +124,7 @@ func (mima *Mima) UpdateFromFrag(fragment *Mima) (needChangeIndex bool) {
 	mima.Password = fragment.Password
 	mima.Notes = fragment.Notes
 	mima.UpdatedAt = fragment.UpdatedAt
-	mima.HistoryItems = fragment.HistoryItems
+	mima.History = fragment.History
 	return true
 }
 
@@ -159,14 +159,14 @@ func (mima *Mima) equalToForm(form *MimaForm) bool {
 }
 
 func (mima *Mima) makeHistory(updatedAt int64) {
-	h := History{
-		Title:     mima.Title,
-		Username:  mima.Username,
-		Password:  mima.Password,
-		Notes:     mima.Notes,
-		UpdatedAt: updatedAt,
+	h := &History{
+		Title:    mima.Title,
+		Username: mima.Username,
+		Password: mima.Password,
+		Notes:    mima.Notes,
+		DateTime: time.Unix(0, updatedAt).Format(dateAndTime),
 	}
-	mima.HistoryItems = append(mima.HistoryItems, h)
+	mima.History = append([]*History{h}, mima.History...)
 }
 
 // Delete 更新删除时间, 即软删除.
@@ -198,6 +198,13 @@ func (mima *Mima) Seal(key SecretKey) (box64 string, err error) {
 
 // ToMimaForm 把 Mima 转换为 MimaForm, 用于与前端网页交流.
 func (mima *Mima) ToMimaForm() *MimaForm {
+	form := mima.ToFormWithHistory()
+	form.History = nil
+	return form
+}
+
+// ToFormWithHistory 把 Mima 转换为有 History 的 MimaForm, 主要用于 edit 页面.
+func (mima *Mima) ToFormWithHistory() *MimaForm {
 	var createdAt, updatedAt, deletedAt string
 	if mima.CreatedAt > 0 {
 		createdAt = time.Unix(0, mima.CreatedAt).Format(dateAndTime)
@@ -218,6 +225,7 @@ func (mima *Mima) ToMimaForm() *MimaForm {
 		CreatedAt: createdAt,
 		UpdatedAt: updatedAt,
 		DeletedAt: deletedAt,
+		History:   mima.History,
 	}
 }
 
@@ -230,6 +238,6 @@ type History struct {
 	Notes    string
 
 	// 考虑到实际使用情景, 在一个 mima 的历史记录里面,
-	// UpdatedAt 应该是唯一的 (同一条记录不可能同时修改两次).
-	UpdatedAt int64
+	// DateTime 应该是唯一的 (同一条记录不可能同时修改两次).
+	DateTime string
 }

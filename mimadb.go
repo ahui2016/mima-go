@@ -315,6 +315,15 @@ func (db *MimaDB) GetFormByID(id string) *MimaForm {
 	return mima.ToMimaForm()
 }
 
+// GetFormWithHistory 凭 id 找 mima 并转换为有 History 的 MimaForm.
+func (db *MimaDB) GetFormWithHistory(id string) *MimaForm {
+	_, mima, err := db.GetByID(id)
+	if err != nil {
+		return &MimaForm{Err: err}
+	}
+	return mima.ToFormWithHistory()
+}
+
 // GetByAlias 凭 alias 找 mima, 如果找不到就返回 nil.
 func (db *MimaDB) GetByAlias(alias string) *Mima {
 	if alias == "" {
@@ -428,32 +437,3 @@ func (db *MimaDB) deleteByID(id string) error {
 func (db *MimaDB) isEmpty() bool {
 	return db.Len() == 0
 }
-
-// insertByUpdatedAt 把 mima 插入到适当的位置, 使链表保持有序.
-// 本函数假设 db.Items 已按更新日期从小到大排序, 先找到最大的更新日期, 把 mima 插入其前面.
-/*
-func (db *MimaDB) insertByUpdatedAt(mima *Mima) {
-	switch i := db.findUpdatedAfter(mima); {
-	case i == 0:
-		panic("这里 index 不能为零, 因为 id:0 的记录应被避开")
-	case i > 0:
-		db.Items = append(append(db.Items[:i], mima), db.Items[i:]...)
-	case i < 0:
-		db.Items = append(db.Items, mima)
-	}
-}
-*/
-
-// findUpdatedAfter 寻找一条记录, 其更新日期大于(晚于)参数 mima 的更新日期.
-// 本函数假设 db.Items 已按更新日期从小到大排序.
-// 如果找不到则返回 -1, 表示参数 mima 的更新日期是最大(最新)的.
-/*
-func (db *MimaDB) findUpdatedAfter(mima *Mima) int {
-	for i := 1; i < db.Len(); i++ { // 这里 i != 0, 避开 id:0 的记录.
-		if db.Items[i].UpdatedAt >= mima.UpdatedAt {
-			return i
-		}
-	}
-	return -1
-}
-*/

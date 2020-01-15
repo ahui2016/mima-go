@@ -134,8 +134,8 @@ func editHandler(w httpRW, r httpReq) {
 	if !ok {
 		return
 	}
+	form = mdb.GetFormWithHistory(id)
 	if r.Method != http.MethodPost {
-		form = mdb.GetFormByID(id)
 		if form.IsDeleted() {
 			form = &MimaForm{Err: errMimaDeleted}
 		}
@@ -149,6 +149,7 @@ func editHandler(w httpRW, r httpReq) {
 		Username: strings.TrimSpace(r.FormValue("Username")),
 		Password: r.FormValue("Password"),
 		Notes:    strings.TrimSpace(r.FormValue("Notes")),
+		History:  form.History,
 	}
 
 	if form.Err = mdb.Update(form); form.Err != nil {

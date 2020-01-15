@@ -1,14 +1,5 @@
 # Todo
 
-- ID 不再使用自增, 改为 timestamp (短) + 三位随机数.
-
-- 当且只当 Operation.Update 的时候才需要使用 MimaDB.findUpdatedAfter,
-  完全不需要用到 insertByUpdatedAt ?
-  - 不对, findUpdatedAfter 也不需要使用
-  - Add: 永远追加到数组的末尾
-  - Delete: 删除, 不需要追加
-  - Edit: 更新后, 也是移动到末尾, 不会移动到其他位置
-  - 需要确保数据库碎片的文件名按顺序排列, 根据时间先后顺序逐条处理
 
 ## 特色: Alias
 
@@ -30,13 +21,12 @@
 ## 数据库操作符号
 
 - 在 Mima 中增加一个数据库操作符号
-  (不需要, 利用 UpdatedAt 来表示)
 
 ## 唯一性检查
 
 - Nonce?
 - 由于数据量少, 就用遍历检查.
-- 以后数据量大, 可以增加一个 map 来提高寻找唯一主键的效率.
+- 以后数据量大, 可以增加一个 map 来提高效率.
 
 ## 自增 ID
 
@@ -58,3 +48,13 @@
   - 如果有修改或删除, 则重写整个文件
   - 如果只有新增, 则直接在文件后 append
 - 但鉴于本软件预估数据量很小, 因此不管任何情况都重写整个文件
+
+## 内部数据结构从 list 改为 slice
+
+- 当且只当 Operation.Update 的时候才需要使用 MimaDB.findUpdatedAfter,
+  完全不需要用到 insertByUpdatedAt ?
+  - 不对, findUpdatedAfter 也不需要使用
+  - Add: 永远追加到数组的末尾
+  - Delete: 删除, 不需要追加
+  - Edit: 更新后, 也是移动到末尾, 不会移动到其他位置
+  - 需要确保数据库碎片的文件名按顺序排列, 根据时间先后顺序逐条处理

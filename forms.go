@@ -18,6 +18,7 @@ type MimaForm struct {
 	CreatedAt string
 	UpdatedAt string
 	DeletedAt string
+	History   []*History
 	Err       error
 	Info      error
 }

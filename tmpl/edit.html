@@ -46,5 +46,24 @@
 </script>
 {{end}}
 
+{{if .History}}
+  <p>History</p>
+  <hr />
+  <ul>
+    {{range .History}}
+      <li>
+        <p>
+          <strong>{{.Title}}</strong>
+          <br />
+          <span class="Deleted" style="font-size:x-small;color:grey">DateTime: {{.DateTime}}</span><br />
+          {{if .Username}}Username: {{.Username}}{{end}}
+          {{if .Password}}Password: {{.Password}}<br />{{end}}
+          {{if .Notes}}Notes: {{.Notes}}{{end}}
+        </p>
+      </li>
+    {{end}}
+  </ul>
+{{end}}
+
 {{template "bottom"}}
 {{end}}
