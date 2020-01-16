@@ -1,0 +1,53 @@
+{{define "delete-forever"}}
+    {{template "top"}}
+
+    <p><a href="/home">mima-go</a> .. Delete Forever (彻底删除)</p>
+
+    <hr />
+
+    {{if .Err}}
+        <p style="font-weight: bold; color: red">
+            Error: {{.Err}}
+        </p>
+    {{end}}
+
+    {{if .ID}}
+        <form action="/delete-forever/" method="POST">
+            <input type="hidden" name="id" value="{{.ID}}" />
+            <p style="font-weight: bold; color: red">
+                Confirm: 彻底这条记录吗? (不可恢复!) <input type="submit" value="Yes" />
+            </p>
+            {{if .Info}}
+                <p  style="font-weight: bold; color: blue">{{.Info}}</p>
+            {{end}}
+        </form>
+        <p>
+            <strong>Title: {{.Title}}</strong><br />
+            {{if .Alias}}Alias: {{.Alias}}<br/>{{end}}
+            {{if .Username}}Username: {{.Username}}<br />{{end}}
+            {{if .Password}}Password: {{.Password}}<br />{{end}}
+            {{if .Notes}}Notes: {{.Notes}}{{end}}
+        </p>
+    {{end}}
+
+    {{if .History}}
+        <p>History</p>
+        <hr />
+        <ul>
+            {{range .History}}
+                <li>
+                    <p>
+                        <strong>{{.Title}}</strong>
+                        <br />
+                        <span class="Deleted" style="font-size:x-small;color:grey">DateTime: {{.DateTime}}</span><br />
+                        {{if .Username}}Username: {{.Username}}{{end}}
+                        {{if .Password}}Password: {{.Password}}<br />{{end}}
+                        {{if .Notes}}Notes: {{.Notes}}{{end}}
+                    </p>
+                </li>
+            {{end}}
+        </ul>
+    {{end}}
+
+    {{template "bottom"}}
+{{end}}

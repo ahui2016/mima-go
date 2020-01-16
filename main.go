@@ -28,6 +28,7 @@ func main() {
 	http.HandleFunc("/delete/", noCache(checkState(deleteHandler)))
 	http.HandleFunc("/recyclebin/", noCache(checkState(recyclebin)))
 	http.HandleFunc("/undelete/", noCache(checkState(undeleteHandler)))
+	http.HandleFunc("/delete-forever/", noCache(checkState(deleteForever)))
 	http.HandleFunc("/edit/", noCache(checkState(editHandler)))
 	http.HandleFunc("/api/new-password", newPassword)
 
@@ -219,7 +220,7 @@ func undeleteHandler(w httpRW, r httpReq) {
 	}
 	form = mdb.GetFormWithHistory(id)
 	if !form.IsDeleted() {
-		form := &MimaForm{Err: errors.New("此记录不在回收站中")}
+		form := &MimaForm{Err: errors.New("回收站中找不到此记录: " + id)}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
@@ -242,6 +243,25 @@ func undeleteHandler(w httpRW, r httpReq) {
 		form.Alias = ""
 	}
 	checkErr(w, templates.ExecuteTemplate(w, "edit", form))
+}
+
+func deleteForever(w httpRW, r httpReq) {
+	form := new(MimaForm)
+	id, ok := getAndCheckID(w, r, "delete-forever", form)
+	if !ok {
+		return
+	}
+	form = mdb.GetFormWithHistory(id)
+	if !form.IsDeleted() {
+		form := &MimaForm{Err: errors.New("回收站中找不到此记录: " + id)}
+		checkErr(w, templates.ExecuteTemplate(w, "delete-forever", form))
+		return
+	}
+	if r.Method != http.MethodPost {
+		checkErr(w, templates.ExecuteTemplate(w, "delete-forever", form))
+		return
+	}
+
 }
 
 func newPassword(w httpRW, _ httpReq) {
