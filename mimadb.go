@@ -157,9 +157,9 @@ func (db *MimaDB) scanDBtoMemory() error {
 
 	for scanner.Scan() {
 		var (
-			mima *Mima
-			err  error
-			key []byte
+			mima  *Mima
+			err   error
+			key   []byte
 			box64 = scanner.Text()
 		)
 		if db.key == nil {
@@ -294,6 +294,7 @@ func (db *MimaDB) newMasterKey() []byte {
 }
 
 // GetByID 凭 id 找 mima. 忽略 id:0. 只有一种错误: 找不到记录.
+// 为什么找不到时要返回错误不返回 nil? 因为后续需要返回错误, 在这里集中处理更方便.
 func (db *MimaDB) GetByID(id string) (index int, mima *Mima, err error) {
 	for index = 1; index < db.Len(); index++ {
 		mima = db.Items[index]
@@ -339,6 +340,17 @@ func (db *MimaDB) GetByAlias(alias string) *Mima {
 		}
 	}
 	return nil
+}
+
+// GetFormByAlias 凭 alias 找 mima, 并转换为 MimaForm 返回.
+// 只有一种错误: 找不到记录, 并且该错误信息已内嵌到 MimaForm 中.
+func (db *MimaDB) GetFormByAlias(alias string) *MimaForm {
+	mima := db.GetByAlias(alias)
+	if mima == nil {
+		err := fmt.Errorf("NotFound: 找不到 alias: %s 的记录", alias)
+		return &MimaForm{Err: err}
+	}
+	return mima.ToMimaForm()
 }
 
 // Add 新增一个 mima 到数据库中, 并生成一块数据库碎片.

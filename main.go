@@ -110,12 +110,14 @@ func searchHandler(w httpRW, r httpReq) {
 	alias := strings.TrimSpace(r.FormValue("alias"))
 	form := new(MimaForm)
 	if alias == "" {
-		form.Info = errors.New("不可搜索空字符串, 请输入完整的别名, 本程序只能精确搜索, 区分大小写")
+		form.Info = errors.New(
+			"不可搜索空字符串, 请输入完整的别名, 本程序只能精确搜索, 区分大小写")
 		result := &SearchResult{"", form}
 		checkErr(w, templates.ExecuteTemplate(w, "search", result))
 		return
 	}
-	result := &SearchResult{alias, &MimaForm{Info: errors.New("Not Found: " + alias)}}
+	form = mdb.GetFormByAlias(alias)
+	result := &SearchResult{alias, form}
 	checkErr(w, templates.ExecuteTemplate(w, "search", result))
 }
 
