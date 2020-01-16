@@ -36,3 +36,8 @@ func (form *MimaForm) HidePasswordNotes() *MimaForm {
 func (form *MimaForm) IsDeleted() bool {
 	return form.DeletedAt != ""
 }
+
+type SearchResult struct {
+	SearchText string
+	*MimaForm
+}

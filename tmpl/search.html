@@ -1,0 +1,37 @@
+{{define "search"}}
+    {{template "top"}}
+    <p>mima-go .. Search Alias (<a href="/logout">logout</a>)</p>
+
+    <hr/>
+
+    <p style="text-align:right">
+        <a href="/home">Show All</a>
+        . <a href="/add">Add</a>
+        . <a href="/recyclebin">Recycle Bin</a>
+    </p>
+
+    <form action="/search/" method="post" autocomplete="off">
+        <label for="alias">Search Alias</label>
+        <input type="text" name="alias" id="alias" class="Fields" autofocus required
+               {{if .SearchText}}value="{{.SearchText}}"{{end}} />
+        <input type="submit" value="Submit"/>
+    </form>
+
+    {{if .Info}}
+        <p style="font-weight: bold; color: blue">{{.Info}}</p>
+    {{else if .}}
+        <p>
+            <strong>{{.Title}}</strong>
+            <span class="ButtonsForTitle">
+                {{if .Username}}<a href="#">名</a>{{end}}
+                {{if .Password}}<a href="#">密</a>{{end}}
+                <a href="/edit?id={{.ID}}">改</a>
+                <a href="/delete?id={{.ID}}">删</a>
+            </span><br/>
+            {{if .Alias}}[{{.Alias}}]<br/>{{end}}
+            {{if .Username}}{{.Username}}{{end}}
+        </p>
+    {{end}}
+
+    {{template "bottom"}}
+{{end}}

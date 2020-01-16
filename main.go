@@ -23,6 +23,7 @@ func main() {
 	http.HandleFunc("/logout", noCache(logoutHandler))
 	http.HandleFunc("/home/", homeHandler)
 	http.HandleFunc("/index/", noCache(checkState(indexHandler)))
+	http.HandleFunc("/search/", noCache(checkState(searchHandler)))
 	http.HandleFunc("/add/", noCache(checkState(addHandler)))
 	http.HandleFunc("/delete/", noCache(checkState(deleteHandler)))
 	http.HandleFunc("/recyclebin/", noCache(checkState(recyclebin)))
@@ -101,6 +102,23 @@ func indexHandler(w httpRW, _ httpReq) {
 	checkErr(w, templates.ExecuteTemplate(w, "index", mdb.All()))
 }
 
+func searchHandler(w httpRW, r httpReq) {
+	if r.Method != http.MethodPost {
+		checkErr(w, templates.ExecuteTemplate(w, "search", nil))
+		return
+	}
+	alias := strings.TrimSpace(r.FormValue("alias"))
+	form := new(MimaForm)
+	if alias == "" {
+		form.Info = errors.New("不可搜索空字符串, 请输入完整的别名, 本程序只能精确搜索, 区分大小写")
+		result := &SearchResult{"", form}
+		checkErr(w, templates.ExecuteTemplate(w, "search", result))
+		return
+	}
+	result := &SearchResult{alias, &MimaForm{Info: errors.New("Not Found: " + alias)}}
+	checkErr(w, templates.ExecuteTemplate(w, "search", result))
+}
+
 func recyclebin(w httpRW, _ httpReq) {
 	checkErr(w, templates.ExecuteTemplate(w, "recyclebin", mdb.DeletedMimas()))
 }
@@ -156,7 +174,8 @@ func editHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
 		return
 	}
-	http.Redirect(w, r, "/home/", http.StatusFound)
+	result := &SearchResult{"", form}
+	checkErr(w, templates.ExecuteTemplate(w, "search", result))
 }
 
 func getAndCheckID(w httpRW, r httpReq, tmpl string, form *MimaForm) (id string, ok bool) {
@@ -196,7 +215,7 @@ func undeleteHandler(w httpRW, r httpReq) {
 	if !ok {
 		return
 	}
-	form = mdb.GetFormByID(id)
+	form = mdb.GetFormWithHistory(id)
 	if !form.IsDeleted() {
 		form := &MimaForm{Err: errors.New("此记录不在回收站中")}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
