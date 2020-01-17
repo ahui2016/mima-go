@@ -261,7 +261,8 @@ func deleteForever(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "delete-forever", form))
 		return
 	}
-
+	checkErr(w, mdb.DeleteForeverByID(id))
+	http.Redirect(w, r, "/recyclebin/", http.StatusFound)
 }
 
 func newPassword(w httpRW, _ httpReq) {

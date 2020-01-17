@@ -221,7 +221,7 @@ func (db *MimaDB) readFragFilesAndUpdate(filePaths []string) error {
 			mima.Alias = frag.Alias
 			mima.UnDelete()
 		case DeleteForever:
-			if err := db.deleteByID(mima.ID); err != nil {
+			if _, err := db.deleteByID(mima.ID); err != nil {
 				return err
 			}
 		default: // 一共 5 种 Operation 已在上面全部处理, 没有其他可能.
@@ -435,15 +435,24 @@ func (db *MimaDB) IsAliasConflicts(alias string, excludedID string) (yes bool) {
 	return false // No, does not conflict.
 }
 
-// deleteByID 删除内存数据库中的指定记录, 不生成数据库碎片.
-// 用于 ReBuild 时根据数据库碎片删除记录.
-func (db *MimaDB) deleteByID(id string) error {
-	i, _, err := db.GetByID(id)
+// DeleteForeverByID 彻底删除一条记录, 并生成一块数据库碎片.
+func (db *MimaDB) DeleteForeverByID(id string) error {
+	mima, err := db.deleteByID(id)
 	if err != nil {
 		return err
 	}
+	return db.sealAndWriteFrag(mima, DeleteForever)
+}
+
+// deleteByID 删除内存数据库中的指定记录, 不生成数据库碎片.
+// 用于 ReBuild 时根据数据库碎片删除记录.
+func (db *MimaDB) deleteByID(id string) (*Mima, error) {
+	i, mima, err := db.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
 	db.Items = append(db.Items[:i], db.Items[i+1:]...)
-	return nil
+	return mima, nil
 }
 
 func (db *MimaDB) isEmpty() bool {
