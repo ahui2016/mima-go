@@ -317,12 +317,13 @@ func (db *MimaDB) GetFormByID(id string) *MimaForm {
 }
 
 // GetFormWithHistory 凭 id 找 mima 并转换为有 History 的 MimaForm.
-func (db *MimaDB) GetFormWithHistory(id string) *MimaForm {
-	_, mima, err := db.GetByID(id)
+func (db *MimaDB) GetFormWithHistory(id string) (form *MimaForm, mima *Mima, err error) {
+	_, mima, err = db.GetByID(id)
 	if err != nil {
-		return &MimaForm{Err: err}
+		return
 	}
-	return mima.ToFormWithHistory()
+	form = mima.ToFormWithHistory()
+	return
 }
 
 // GetByAlias 凭 alias 找 mima, 如果找不到就返回 nil.
@@ -377,7 +378,10 @@ func (db *MimaDB) Update(form *MimaForm) (err error) {
 	if err != nil {
 		return err
 	}
-	needChangeIndex, needWriteFrag := mima.UpdateFromForm(form)
+	needChangeIndex, needWriteFrag, err := mima.UpdateFromForm(form)
+	if err != nil {
+		return err
+	}
 	if needChangeIndex {
 		db.Items = append(db.Items, mima)
 		db.Items = append(db.Items[:i], db.Items[i+1:]...)
@@ -442,6 +446,15 @@ func (db *MimaDB) DeleteForeverByID(id string) error {
 		return err
 	}
 	return db.sealAndWriteFrag(mima, DeleteForever)
+}
+
+func (db *MimaDB) DeleteHistoryItem(id string, i int) error {
+	_, mima, err := db.GetByID(id)
+	if err != nil {
+		return err
+	}
+	mima.DeleteHistory(i)
+	return db.sealAndWriteFrag(mima, Update)
 }
 
 // deleteByID 删除内存数据库中的指定记录, 不生成数据库碎片.

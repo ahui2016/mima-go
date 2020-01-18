@@ -114,9 +114,11 @@ func DecryptToMima(box64 string, key SecretKey) (*Mima, error) {
 
 // UpdateFromFrag 以数据库碎片中的内容为准, 更新内存中的条目.
 func (mima *Mima) UpdateFromFrag(fragment *Mima) (needChangeIndex bool) {
+	// Alias 或 History 有可能发生了更改 (即使更新日期没有变化)
+	mima.Alias = fragment.Alias
+	mima.History = fragment.History
+
 	if mima.UpdatedAt == fragment.UpdatedAt {
-		// 更新日期没有变化, 但生成了数据库碎片, 即有且只有 Alias 发生了更改.
-		mima.Alias = fragment.Alias
 		return false
 	}
 	mima.Title = fragment.Title
@@ -124,29 +126,30 @@ func (mima *Mima) UpdateFromFrag(fragment *Mima) (needChangeIndex bool) {
 	mima.Password = fragment.Password
 	mima.Notes = fragment.Notes
 	mima.UpdatedAt = fragment.UpdatedAt
-	mima.History = fragment.History
 	return true
 }
 
 // UpdateFromForm 以前端传回来的 MimaForm 为准, 更新内存中的条目内容.
 // 如果只有 Alias 发生改变, 则改变 Alias, 但不生成历史记录, 也不移动元素.
-func (mima *Mima) UpdateFromForm(form *MimaForm) (needChangeIndex bool, needWriteFrag bool) {
+func (mima *Mima) UpdateFromForm(form *MimaForm) (needChangeIndex bool, needWriteFrag bool, err error) {
 	if mima.Alias != form.Alias {
 		mima.Alias = form.Alias
 		needWriteFrag = true
 	}
 	if mima.equalToForm(form) {
-		return false, needWriteFrag
+		return false, needWriteFrag, nil
 	}
 	updatedAt := time.Now().UnixNano()
-	mima.makeHistory(updatedAt)
+	if err = mima.makeHistory(updatedAt); err != nil {
+		return
+	}
 
 	mima.Title = form.Title
 	mima.Username = form.Username
 	mima.Password = form.Password
 	mima.Notes = form.Notes
 	mima.UpdatedAt = updatedAt
-	return true, true
+	return true, true, nil
 }
 
 // equalToForm 用于检查 mima 与 form 的内容是否需要基本相等.
@@ -158,15 +161,22 @@ func (mima *Mima) equalToForm(form *MimaForm) bool {
 	return s1 == s2
 }
 
-func (mima *Mima) makeHistory(updatedAt int64) {
+func (mima *Mima) makeHistory(updatedAt int64) error {
+	datetime := time.Unix(0, updatedAt).Format(dateAndTime)
+	for _, v := range mima.History {
+		if v.DateTime == datetime {
+			return errors.New("历史记录的 DateTime 发生重复")
+		}
+	}
 	h := &History{
 		Title:    mima.Title,
 		Username: mima.Username,
 		Password: mima.Password,
 		Notes:    mima.Notes,
-		DateTime: time.Unix(0, updatedAt).Format(dateAndTime),
+		DateTime: datetime,
 	}
 	mima.History = append([]*History{h}, mima.History...)
+	return nil
 }
 
 // Delete 更新删除时间, 即软删除.
@@ -229,6 +239,22 @@ func (mima *Mima) ToFormWithHistory() *MimaForm {
 	}
 }
 
+// DeleteHistory 删除一条历史记录.
+// 这里不检查第 i 条历史记录是否存在, 请使用 GetHistory 获得正确的 i.
+func (mima *Mima) DeleteHistory(i int) {
+	mima.History = append(mima.History[:i], mima.History[i+1:]...)
+}
+
+func (mima *Mima) GetHistory(datetime string) (i int, item *History, ok bool) {
+	ok = true
+	for i, item = range mima.History {
+		if item.DateTime == datetime {
+			return
+		}
+	}
+	return i, item, false
+}
+
 // History 用来保存修改历史.
 // 全部内容均直接保留当时的 Mima 内容, 不作任何修改.
 type History struct {
@@ -240,4 +266,5 @@ type History struct {
 	// 考虑到实际使用情景, 在一个 mima 的历史记录里面,
 	// DateTime 应该是唯一的 (同一条记录不可能同时修改两次).
 	DateTime string
+	ToDelete bool
 }

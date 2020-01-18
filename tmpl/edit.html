@@ -54,10 +54,20 @@
       <li>
         <p>
           <strong>{{.Title}}</strong>
+          {{if .ToDelete}}
+            <form action="/api/delete-history" method="post">
+              <input type="hidden" name="id" value="$.ID" />
+              <input type="hidden" name="datetime" value=".DateTime" />
+              <span style="color: red">真的删除吗? (不可恢复)</span>
+              <input type="submit" value="delete" />
+            </form>
+          {{else}}
+            <span><a href="/edit?id={{$.ID}}&datetime={{.DateTime}}">delete</a></span>
+          {{end}}
           <br />
           <span class="Deleted" style="font-size:x-small;color:grey">DateTime: {{.DateTime}}</span><br />
-          {{if .Username}}Username: {{.Username}}{{end}}
-          {{if .Password}}Password: {{.Password}}<br />{{end}}
+          {{if .Username}}Username:{{.Username}}{{end}}
+          {{if .Password}}Password:{{.Password}}<br />{{end}}
           {{if .Notes}}Notes: {{.Notes}}{{end}}
         </p>
       </li>
