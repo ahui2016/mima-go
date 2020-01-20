@@ -71,18 +71,15 @@ func TestMima_DeleteHistory(t *testing.T) {
 	})
 	t.Run("Test not found", func(*testing.T) {
 		wrongDatetime := "abc"
-		_, _, ok := mima.GetHistory(wrongDatetime)
-		if ok {
-			t.Fatal("want: ok == false, got: ok == true")
+		if err := mima.DeleteHistory(wrongDatetime); err == nil {
+			t.Fatal("want: Error Not Found, got: no error")
 		}
 	})
 	for i := len(titles) - 1; i >= 0; i-- {
 		datetime := mima.History[i].DateTime
-		index, _, ok := mima.GetHistory(datetime)
-		if !ok {
-			t.Fatal("历史记录不存在:", index)
+		if err := mima.DeleteHistory(datetime); err != nil {
+			t.Fatal(err)
 		}
-		mima.DeleteHistory(index)
 		name := fmt.Sprintf("Test deleting History[%d]", i)
 		t.Run(name, func(*testing.T) {
 			if len(mima.History) != i {

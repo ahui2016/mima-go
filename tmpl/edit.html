@@ -12,12 +12,6 @@
   </p>
 {{end}}
 
-{{if .Info}}
-  <p style="font-weight: bold; color: blue">
-  Info: {{.Info}}
-  </p>
-{{end}}
-
 {{ if .ID }}
 <form action="/edit/" method="POST" autocomplete="off">
   <input type="hidden" name="id" value="{{.ID}}" />
@@ -46,30 +40,34 @@
 </script>
 {{end}}
 
+{{if .Info}}
+  <p style="font-weight: bold; color: blue">
+    Info: {{.Info}}
+  </p>
+{{end}}
+
 {{if .History}}
   <p>History</p>
   <hr />
   <ul>
     {{range .History}}
       <li>
-        <p>
+        <div>
           <strong>{{.Title}}</strong>
-          {{if .ToDelete}}
-            <form action="/api/delete-history" method="post">
-              <input type="hidden" name="id" value="$.ID" />
-              <input type="hidden" name="datetime" value=".DateTime" />
-              <span style="color: red">真的删除吗? (不可恢复)</span>
-              <input type="submit" value="delete" />
-            </form>
-          {{else}}
-            <span><a href="/edit?id={{$.ID}}&datetime={{.DateTime}}">delete</a></span>
-          {{end}}
+          <a href="#" onclick="this.style.display = 'none';
+              this.parentElement.getElementsByTagName('form')[0].style.display = 'inline'">delete</a>
+          <form action="/api/delete-history" method="post" style="display: none">
+            <input type="hidden" name="id" value="$.ID" />
+            <input type="hidden" name="datetime" value=".DateTime" />
+            <span style="color: red">真的删除吗? (不可恢复)</span>
+            <input type="submit" value="delete" />
+          </form>
           <br />
           <span class="Deleted" style="font-size:x-small;color:grey">DateTime: {{.DateTime}}</span><br />
           {{if .Username}}Username:{{.Username}}{{end}}
           {{if .Password}}Password:{{.Password}}<br />{{end}}
           {{if .Notes}}Notes: {{.Notes}}{{end}}
-        </p>
+        </div>
       </li>
     {{end}}
   </ul>

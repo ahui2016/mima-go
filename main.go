@@ -31,6 +31,7 @@ func main() {
 	http.HandleFunc("/delete-forever/", noCache(checkState(deleteForever)))
 	http.HandleFunc("/edit/", noCache(checkState(editHandler)))
 	http.HandleFunc("/api/new-password", newPassword)
+	http.HandleFunc("/api/delete-history", checkState(deleteHistory))
 
 	fmt.Println(listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, nil))
@@ -155,10 +156,7 @@ func editHandler(w httpRW, r httpReq) {
 	if !ok {
 		return
 	}
-	form, mima, err := mdb.GetFormWithHistory(id)
-	if err != nil {
-		form = &MimaForm{Err: err}
-	}
+	form = mdb.GetFormWithHistory(id)
 	if r.Method != http.MethodPost {
 		if form.IsDeleted() {
 			form = &MimaForm{Err: errMimaDeleted}
@@ -175,7 +173,6 @@ func editHandler(w httpRW, r httpReq) {
 		Notes:    strings.TrimSpace(r.FormValue("Notes")),
 		History:  form.History,
 	}
-
 	if form.Err = mdb.Update(form); form.Err != nil {
 		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
 		return
@@ -216,15 +213,12 @@ func deleteHandler(w httpRW, r httpReq) {
 }
 
 func undeleteHandler(w httpRW, r httpReq) {
-	var err error
 	form := new(MimaForm)
 	id, ok := getAndCheckID(w, r, "undelete", form)
 	if !ok {
 		return
 	}
-	if form, _, err = mdb.GetFormWithHistory(id); err != nil {
-		form = &MimaForm{Err: err}
-	}
+	form = mdb.GetFormWithHistory(id)
 	if !form.IsDeleted() {
 		form := &MimaForm{Err: errors.New("回收站中找不到此记录: " + id)}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
@@ -238,7 +232,7 @@ func undeleteHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
-	err = mdb.UnDeleteByID(id)
+	err := mdb.UnDeleteByID(id)
 	if err != nil && !errors.Is(err, errAliasConflicts) {
 		form = &MimaForm{Err: err}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
@@ -252,15 +246,12 @@ func undeleteHandler(w httpRW, r httpReq) {
 }
 
 func deleteForever(w httpRW, r httpReq) {
-	var err error
 	form := new(MimaForm)
 	id, ok := getAndCheckID(w, r, "delete-forever", form)
 	if !ok {
 		return
 	}
-	if form, _, err = mdb.GetFormWithHistory(id); err != nil {
-		form = &MimaForm{Err: err}
-	}
+	form = mdb.GetFormWithHistory(id)
 	if !form.IsDeleted() {
 		form := &MimaForm{Err: errors.New("回收站中找不到此记录: " + id)}
 		checkErr(w, templates.ExecuteTemplate(w, "delete-forever", form))
@@ -272,6 +263,19 @@ func deleteForever(w httpRW, r httpReq) {
 	}
 	checkErr(w, mdb.DeleteForeverByID(id))
 	http.Redirect(w, r, "/recyclebin/", http.StatusFound)
+}
+
+func deleteHistory(w httpRW, r httpReq) {
+	form := new(MimaForm)
+	id, ok := getAndCheckID(w, r, "delete-forever", form)
+	if !ok {
+		return
+	}
+	datetime := strings.TrimSpace(r.FormValue("datetime"))
+	if len(datetime) < len(dateAndTime) {
+		_, _ = fmt.Fprintf(w, "找不到历史记录: %s", datetime)
+	}
+	checkErr(w, mdb.DeleteHistoryItem(id, datetime))
 }
 
 func newPassword(w httpRW, _ httpReq) {

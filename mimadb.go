@@ -317,13 +317,12 @@ func (db *MimaDB) GetFormByID(id string) *MimaForm {
 }
 
 // GetFormWithHistory 凭 id 找 mima 并转换为有 History 的 MimaForm.
-func (db *MimaDB) GetFormWithHistory(id string) (form *MimaForm, mima *Mima, err error) {
-	_, mima, err = db.GetByID(id)
+func (db *MimaDB) GetFormWithHistory(id string) *MimaForm {
+	_, mima, err := db.GetByID(id)
 	if err != nil {
-		return
+		return &MimaForm{Err: err}
 	}
-	form = mima.ToFormWithHistory()
-	return
+	return mima.ToFormWithHistory()
 }
 
 // GetByAlias 凭 alias 找 mima, 如果找不到就返回 nil.
@@ -448,12 +447,14 @@ func (db *MimaDB) DeleteForeverByID(id string) error {
 	return db.sealAndWriteFrag(mima, DeleteForever)
 }
 
-func (db *MimaDB) DeleteHistoryItem(id string, i int) error {
+func (db *MimaDB) DeleteHistoryItem(id string, datetime string) error {
 	_, mima, err := db.GetByID(id)
 	if err != nil {
 		return err
 	}
-	mima.DeleteHistory(i)
+	if err = mima.DeleteHistory(datetime); err != nil {
+		return err
+	}
 	return db.sealAndWriteFrag(mima, Update)
 }
 

@@ -225,6 +225,7 @@ func (mima *Mima) ToFormWithHistory() *MimaForm {
 	if mima.DeletedAt > 0 {
 		deletedAt = time.Unix(0, mima.DeletedAt).Format(dateAndTime)
 	}
+
 	return &MimaForm{
 		ID:        mima.ID,
 		Title:     mima.Title,
@@ -239,20 +240,23 @@ func (mima *Mima) ToFormWithHistory() *MimaForm {
 	}
 }
 
-// DeleteHistory 删除一条历史记录.
-// 这里不检查第 i 条历史记录是否存在, 请使用 GetHistory 获得正确的 i.
-func (mima *Mima) DeleteHistory(i int) {
-	mima.History = append(mima.History[:i], mima.History[i+1:]...)
+// DeleteHistory 彻底删除一条历史记录.
+func (mima *Mima) DeleteHistory(datetime string) error {
+	if i := mima.getHistory(datetime); i < 0 {
+		return errors.New("找不到历史记录:" + datetime)
+	} else {
+		mima.History = append(mima.History[:i], mima.History[i+1:]...)
+		return nil
+	}
 }
 
-func (mima *Mima) GetHistory(datetime string) (i int, item *History, ok bool) {
-	ok = true
-	for i, item = range mima.History {
+func (mima *Mima) getHistory(datetime string) int {
+	for i, item := range mima.History {
 		if item.DateTime == datetime {
-			return
+			return i
 		}
 	}
-	return i, item, false
+	return -1
 }
 
 // History 用来保存修改历史.
@@ -266,5 +270,4 @@ type History struct {
 	// 考虑到实际使用情景, 在一个 mima 的历史记录里面,
 	// DateTime 应该是唯一的 (同一条记录不可能同时修改两次).
 	DateTime string
-	ToDelete bool
 }
