@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -266,16 +267,25 @@ func deleteForever(w httpRW, r httpReq) {
 }
 
 func deleteHistory(w httpRW, r httpReq) {
-	form := new(MimaForm)
-	id, ok := getAndCheckID(w, r, "delete-forever", form)
-	if !ok {
+	id := strings.TrimSpace(r.FormValue("id"))
+	if id == "" {
+		http.Error(w, "id 不可为空", http.StatusNotAcceptable)
 		return
 	}
 	datetime := strings.TrimSpace(r.FormValue("datetime"))
 	if len(datetime) < len(dateAndTime) {
-		_, _ = fmt.Fprintf(w, "找不到历史记录: %s", datetime)
+		http.Error(w, fmt.Sprintf("格式错误: %s", datetime), http.StatusConflict)
+		return
 	}
-	checkErr(w, mdb.DeleteHistoryItem(id, datetime))
+	if err := mdb.DeleteHistoryItem(id, datetime); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+}
+
+func writeJSON(w httpRW, msg string, status int) {
+	w.WriteHeader(status)
+	checkErr(w, json.NewEncoder(w).Encode(msg))
 }
 
 func newPassword(w httpRW, _ httpReq) {

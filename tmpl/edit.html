@@ -26,7 +26,7 @@
            value="{{.Username}}" onblur="this.value = this.value.trim()" />
   <label for="Password">Password: (<a href="#" onclick="generatePW()">generate</a>)</label>
     <input type="text" name="Password" id="Password" class="Fields"
-           style="font-family:Serif;" 
+           style="font-family:serif;"
            value="{{.Password}}" oninput="display_pwd()" />
     <div id="pwd" style="font-size: larger;margin-left: 1.1em;"></div>
   <label for="Notes">Notes:</label>
@@ -35,7 +35,7 @@
     <input type="submit" value="Submit" />
   </p>
 </form>
-<script type="text/javascript">
+<script>
   display_pwd()
 </script>
 {{end}}
@@ -51,17 +51,15 @@
   <hr />
   <ul>
     {{range .History}}
-      <li>
+      <li id="{{.DateTime}}">
         <div>
           <strong>{{.Title}}</strong>
           <a href="#" onclick="this.style.display = 'none';
-              this.parentElement.getElementsByTagName('form')[0].style.display = 'inline'">delete</a>
-          <form action="/api/delete-history" method="post" style="display: none">
-            <input type="hidden" name="id" value="$.ID" />
-            <input type="hidden" name="datetime" value=".DateTime" />
+              this.parentElement.getElementsByTagName('span')[0].style.display = 'inline'">delete</a>
+          <span style="display: none">
             <span style="color: red">真的删除吗? (不可恢复)</span>
-            <input type="submit" value="delete" />
-          </form>
+            <button onclick="deleteHistory({{$.ID}}, {{.DateTime}})">delete</button>
+          </span>
           <br />
           <span class="Deleted" style="font-size:x-small;color:grey">DateTime: {{.DateTime}}</span><br />
           {{if .Username}}Username:{{.Username}}{{end}}
@@ -71,6 +69,29 @@
       </li>
     {{end}}
   </ul>
+
+  <script>
+    function deleteHistory(id, datetime) {
+      const xhr = new XMLHttpRequest();
+      const FD = new FormData();
+      FD.append("id", id);
+      FD.append("datetime", datetime);
+
+      xhr.open('POST', '/api/delete-history');
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          document.getElementById(datetime).remove();
+        } else {
+          console.log(xhr.responseText);
+          window.alert(xhr.responseText);
+        }
+      };
+      xhr.onerror = function() {
+        window.alert('出错, 删除历史记录失败.');
+      };
+      xhr.send(FD);
+    }
+  </script>
 {{end}}
 
 {{template "bottom"}}

@@ -1,6 +1,7 @@
 # Todo
 
-- 删除历史记录的确认功能还是在前端做吧.
+- id="history-{{$.ID}}"
+- api错误信息应返回 json
 
 ## 特色: Alias
 

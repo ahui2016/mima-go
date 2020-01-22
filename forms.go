@@ -41,3 +41,7 @@ type SearchResult struct {
 	SearchText string
 	*MimaForm
 }
+
+type AjaxResponse struct {
+	Message string
+}
