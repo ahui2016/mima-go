@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -283,10 +282,12 @@ func deleteHistory(w httpRW, r httpReq) {
 	}
 }
 
+/*
 func writeJSON(w httpRW, msg string, status int) {
 	w.WriteHeader(status)
 	checkErr(w, json.NewEncoder(w).Encode(msg))
 }
+*/
 
 func newPassword(w httpRW, _ httpReq) {
 	pwBytes := make([]byte, passwordSize)

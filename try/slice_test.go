@@ -11,8 +11,7 @@ type SliceInside struct {
 }
 
 func TestSliceInStruct(t *testing.T) {
-	s := new(SliceInside)
-	// s := NewSliceInSide() // 不行, 需要初始化.
+	s := new(SliceInside) // SliceInside 需要初始化, Slice 不需要.
 	t.Logf("%v", s.Slice)
 	s.Slice = append(s.Slice, 3, 5)
 	t.Logf("%v", s.Slice)

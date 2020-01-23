@@ -1,7 +1,6 @@
 # Todo
 
-- id="history-{{$.ID}}"
-- api错误信息应返回 json
+- 把 MimaDB 分离出来作为 sub-package.
 
 ## 特色: Alias
 
