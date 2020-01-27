@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	mimaDB "github.com/ahui2016/mima-go/db"
 	"log"
 	"net/http"
 	"strings"
@@ -54,8 +55,7 @@ func createAccount(w httpRW, r httpReq) {
 		return
 	}
 	key := sha256.Sum256([]byte(password))
-	mdb = NewMimaDB(&key)
-	if err := mdb.MakeFirstMima(); err != nil {
+	if err := db.Init(&key); err != nil {
 		checkErr(w, templates.ExecuteTemplate(w, "create-account", &Feedback{Err: err}))
 		return
 	}
@@ -81,8 +81,8 @@ func loginHandler(w httpRW, r httpReq) {
 	}
 	password := r.FormValue("password")
 	key := sha256.Sum256([]byte(password))
-	mdb = NewMimaDB(&key)
-	if _, err := mdb.Rebuild(); err != nil {
+	db.Reset()
+	if _, err := db.Rebuild(&key); err != nil {
 		logout()
 		checkErr(w, templates.ExecuteTemplate(w, "login", &Feedback{Err: err}))
 		return
@@ -101,7 +101,7 @@ func homeHandler(w httpRW, r httpReq) {
 }
 
 func indexHandler(w httpRW, _ httpReq) {
-	checkErr(w, templates.ExecuteTemplate(w, "index", mdb.All()))
+	checkErr(w, templates.ExecuteTemplate(w, "index", db.All()))
 }
 
 func searchHandler(w httpRW, r httpReq) {
@@ -114,17 +114,17 @@ func searchHandler(w httpRW, r httpReq) {
 	if alias == "" {
 		form.Info = errors.New(
 			"不可搜索空字符串, 请输入完整的别名, 本程序只能精确搜索, 区分大小写")
-		result := &SearchResult{"", form}
+		result := &SearchResult{MimaForm: form}
 		checkErr(w, templates.ExecuteTemplate(w, "search", result))
 		return
 	}
-	form = mdb.GetFormByAlias(alias)
-	result := &SearchResult{alias, form}
+	form = db.GetFormByAlias(alias)
+	result := &SearchResult{SearchText: alias, MimaForm: form}
 	checkErr(w, templates.ExecuteTemplate(w, "search", result))
 }
 
 func recyclebin(w httpRW, _ httpReq) {
-	checkErr(w, templates.ExecuteTemplate(w, "recyclebin", mdb.DeletedMimas()))
+	checkErr(w, templates.ExecuteTemplate(w, "recyclebin", db.DeletedMimas()))
 }
 
 func addHandler(w httpRW, r httpReq) {
@@ -138,9 +138,9 @@ func addHandler(w httpRW, r httpReq) {
 		Password: r.FormValue("Password"),
 		Notes:    strings.TrimSpace(r.FormValue("Notes")),
 	}
-	mima, err := NewMimaFromForm(form)
+	mima, err := mimaDB.NewMimaFromForm(form)
 	if err == nil {
-		err = mdb.Add(mima)
+		err = db.Add(mima)
 	}
 	if err != nil {
 		form.Err = err
@@ -156,7 +156,7 @@ func editHandler(w httpRW, r httpReq) {
 	if !ok {
 		return
 	}
-	form = mdb.GetFormWithHistory(id)
+	form = db.GetFormByID(id)
 	if r.Method != http.MethodPost {
 		if form.IsDeleted() {
 			form = &MimaForm{Err: errMimaDeleted}
@@ -173,11 +173,11 @@ func editHandler(w httpRW, r httpReq) {
 		Notes:    strings.TrimSpace(r.FormValue("Notes")),
 		History:  form.History,
 	}
-	if form.Err = mdb.Update(form); form.Err != nil {
+	if form.Err = db.Update(form); form.Err != nil {
 		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
 		return
 	}
-	result := &SearchResult{"", form}
+	result := &SearchResult{MimaForm: form}
 	checkErr(w, templates.ExecuteTemplate(w, "search", result))
 }
 
@@ -197,14 +197,14 @@ func deleteHandler(w httpRW, r httpReq) {
 		return
 	}
 	if r.Method != http.MethodPost {
-		form = mdb.GetFormByID(id)
+		form = db.GetFormByID(id).HideSecrets()
 		if form.IsDeleted() {
 			form = &MimaForm{Err: errMimaDeleted}
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "delete", form))
 		return
 	}
-	if err := mdb.TrashByID(id); err != nil {
+	if err := db.TrashByID(id); err != nil {
 		form.Err = err
 		checkErr(w, templates.ExecuteTemplate(w, "delete", form))
 		return
@@ -218,27 +218,28 @@ func undeleteHandler(w httpRW, r httpReq) {
 	if !ok {
 		return
 	}
-	form = mdb.GetFormWithHistory(id)
+	form = db.GetFormByID(id)
 	if !form.IsDeleted() {
 		form := &MimaForm{Err: errors.New("回收站中找不到此记录: " + id)}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
 	if r.Method != http.MethodPost {
-		if mdb.IsAliasConflicts(form.Alias, id) {
+		if db.IsAliasConflicts(form.Alias, id) {
 			form.Info = fmt.Errorf(
-				"%w: %s, 如果确认还原此记录, 该 alias 将被清空", errAliasConflicts, form.Alias)
+				"%w: %s, 如果确认还原此记录, 该 alias 将被清空",
+				mimaDB.ErrAliasConflicts, form.Alias)
 		}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
-	err := mdb.UnDeleteByID(id)
-	if err != nil && !errors.Is(err, errAliasConflicts) {
+	err := db.UnDeleteByID(id)
+	if err != nil && !errors.Is(err, mimaDB.ErrAliasConflicts) {
 		form = &MimaForm{Err: err}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
-	if errors.Is(err, errAliasConflicts) {
+	if errors.Is(err, mimaDB.ErrAliasConflicts) {
 		form.Info = err
 		form.Alias = ""
 	}
@@ -251,7 +252,7 @@ func deleteForever(w httpRW, r httpReq) {
 	if !ok {
 		return
 	}
-	form = mdb.GetFormWithHistory(id)
+	form = db.GetFormByID(id)
 	if !form.IsDeleted() {
 		form := &MimaForm{Err: errors.New("回收站中找不到此记录: " + id)}
 		checkErr(w, templates.ExecuteTemplate(w, "delete-forever", form))
@@ -261,7 +262,7 @@ func deleteForever(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "delete-forever", form))
 		return
 	}
-	checkErr(w, mdb.DeleteForeverByID(id))
+	checkErr(w, db.DeleteForeverByID(id))
 	http.Redirect(w, r, "/recyclebin/", http.StatusFound)
 }
 
@@ -272,11 +273,11 @@ func deleteHistory(w httpRW, r httpReq) {
 		return
 	}
 	datetime := strings.TrimSpace(r.FormValue("datetime"))
-	if len(datetime) < len(dateAndTime) {
+	if len(datetime) < len(mimaDB.DateTimeFormat) {
 		http.Error(w, fmt.Sprintf("格式错误: %s", datetime), http.StatusConflict)
 		return
 	}
-	if err := mdb.DeleteHistoryItem(id, datetime); err != nil {
+	if err := db.DeleteHistoryItem(id, datetime); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
@@ -306,9 +307,9 @@ func checkErr(w httpRW, err error) {
 }
 
 func logout() {
-	mdb = nil
+	db.Reset()
 }
 
 func isLoggedOut() bool {
-	return mdb == nil
+	return db.IsNotInit()
 }

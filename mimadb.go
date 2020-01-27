@@ -1,4 +1,3 @@
-package main
 
 import (
 	"bufio"
@@ -386,7 +385,7 @@ func (db *MimaDB) Update(form *MimaForm) (err error) {
 		db.Items = append(db.Items[:i], db.Items[i+1:]...)
 	}
 	if needWriteFrag {
-		err = mdb.sealAndWriteFrag(mima, Update)
+		err = db.sealAndWriteFrag(mima, Update)
 	}
 	return
 }

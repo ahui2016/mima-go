@@ -1,4 +1,3 @@
-package main
 
 // Feedback 用来表示一个普通的表单.
 type Feedback struct {
