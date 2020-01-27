@@ -43,8 +43,8 @@ type DB struct {
 	key     *SecretKey
 
 	// 本数据库具有定时关闭功能, 这是数据库启动时刻和有效时长.
-	startedAt time.Time
-	validTerm time.Duration
+	StartedAt time.Time
+	ValidTerm time.Duration
 
 	// 数据库文件的绝对路径, 备份文件夹的绝对路径.
 	// 另外, 数据库碎片文件的后缀名和数据库备份文件的后缀名在 db/init.go 中定义.
@@ -59,6 +59,8 @@ func NewDB(fullPath, backupDir string) *DB {
 	return &DB{
 		FullPath:  fullPath,
 		BackupDir: backupDir,
+		StartedAt: time.Now(),
+		ValidTerm: time.Minute * 5,
 	}
 }
 
@@ -76,14 +78,12 @@ func (db *DB) IsNotInit() bool {
 // 第一条记录的 ID 特殊处理, 手动设置为空字符串.
 // 同时会生成数据库文件 DB.FullPath
 func (db *DB) Init(userKey *SecretKey) error {
-	if !db.fileNotExist() {
+	if !db.FileNotExist() {
 		return errors.New("数据库文件已存在, 不可重复创建")
 	}
 	key := newRandomKey()
 	db.key = &key
 	db.userKey = userKey
-	db.startedAt = time.Now()
-	db.validTerm =  time.Minute * 5
 	mima, err := NewMima("")
 	if err != nil {
 		return err
@@ -107,7 +107,7 @@ func (db *DB) Rebuild(userKey *SecretKey) (tarballFile string, err error) {
 	if !db.isEmpty() {
 		return tarballFile, errors.New("初始化失败: 内存中的数据库已有数据")
 	}
-	if db.fileNotExist() {
+	if db.FileNotExist() {
 		return "", FileNotFound
 	}
 	if err = db.readFullPath(); err != nil {
@@ -275,6 +275,7 @@ func (db *DB) GetFormByAlias(alias string) *MimaForm {
 	}
 	return mima.ToForm().HideSecrets()
 }
+
 // backupToTar 把数据库文件以及碎片文件备份到一个 tarball 里.
 // 主要在 Rebuild 之前使用, 以防万一 rebuild 出错.
 // 为了方便测试返回 tarball 的完整路径.
@@ -309,7 +310,7 @@ func (db *DB) Len() int {
 	return len(db.mimaTable)
 }
 
-func (db *DB) fileNotExist() bool {
+func (db *DB) FileNotExist() bool {
 	_, err := os.Stat(db.FullPath)
 	if os.IsNotExist(err) {
 		return true

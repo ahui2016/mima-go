@@ -8,7 +8,7 @@ import (
 func checkState(fn httpHF) httpHF {
 	return func(w httpRW, r httpReq) {
 		if !isLoggedOut() {
-			expired := mdb.StartedAt.Add(mdb.Period)
+			expired := db.StartedAt.Add(db.ValidTerm)
 			if time.Now().After(expired) {
 				// 已登入, 但超时.
 				logout()
@@ -18,14 +18,14 @@ func checkState(fn httpHF) httpHF {
 			}
 
 			// 已登入, 未超时, 重新计时.
-			mdb.Lock()
-			defer mdb.Unlock()
-			mdb.StartedAt = time.Now()
+			db.Lock()
+			defer db.Unlock()
+			db.StartedAt = time.Now()
 			fn(w, r)
 			return
 		}
 
-		if dbFileIsNotExist() {
+		if db.FileNotExist() {
 			// 数据库不存在, 需要创建新账号.
 			checkErr(w, templates.ExecuteTemplate(w, "create-account", nil))
 		} else {

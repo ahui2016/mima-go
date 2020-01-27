@@ -39,7 +39,7 @@ func main() {
 }
 
 func createAccount(w httpRW, r httpReq) {
-	if !isLoggedOut() || !dbFileIsNotExist() {
+	if !isLoggedOut() || !db.FileNotExist() {
 		err := &Feedback{Err: errors.New("已存在账号, 不可重复创建")}
 		checkErr(w, templates.ExecuteTemplate(w, "create-account", err))
 		return
@@ -65,7 +65,7 @@ func createAccount(w httpRW, r httpReq) {
 }
 
 func loginHandler(w httpRW, r httpReq) {
-	if dbFileIsNotExist() {
+	if db.FileNotExist() {
 		// 数据库不存在, 需要创建新账号.
 		checkErr(w, templates.ExecuteTemplate(w, "create-account", nil))
 		return

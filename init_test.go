@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 	os.Exit(app)
 }
 
-// 使用命令 go test -v -o ./mima.exe
+// 使用命令 go test -v -o mima.exe
 // 注意参数 -o, 用来强制指定文件夹, 如果不使用该参数, 测试有可能使用临时文件夹.
 // 我这里出现了奇怪的情况, 有时该命令无法更改文件夹, 需要尝试多次才能成功.
 func TestPaths(t *testing.T) {
