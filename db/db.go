@@ -48,16 +48,17 @@ type DB struct {
 
 	// 数据库文件的绝对路径, 备份文件夹的绝对路径.
 	// 另外, 数据库碎片文件的后缀名和数据库备份文件的后缀名在 db/init.go 中定义.
-	fullPath  string
-	backupDir string
+	// 为了方便测试, 权限设为 public.
+	FullPath  string
+	BackupDir string
 }
 
 // NewDB 生成一个新的 DB. 此时, 内存数据库里没有数据, 也没有 key.
 // 要么通过 DB.Init 生成新的数据库, 要么通过 DB.Rebuild 从文件中恢复数据库.
 func NewDB(fullPath, backupDir string) *DB {
 	return &DB{
-		fullPath:  fullPath,
-		backupDir: backupDir,
+		FullPath:  fullPath,
+		BackupDir: backupDir,
 	}
 }
 
@@ -73,7 +74,7 @@ func (db *DB) IsNotInit() bool {
 
 // Init 生成第一条记录, 用于保存密码.
 // 第一条记录的 ID 特殊处理, 手动设置为空字符串.
-// 同时会生成数据库文件 DB.fullPath
+// 同时会生成数据库文件 DB.FullPath
 func (db *DB) Init(userKey *SecretKey) error {
 	if !db.fileNotExist() {
 		return errors.New("数据库文件已存在, 不可重复创建")
@@ -95,7 +96,7 @@ func (db *DB) Init(userKey *SecretKey) error {
 	if err != nil {
 		return err
 	}
-	return writeFile(db.fullPath, box64)
+	return writeFile(db.FullPath, box64)
 }
 
 // Rebuild 填充内存数据库，读取数据库碎片, 整合到数据库文件中.
@@ -135,7 +136,7 @@ func (db *DB) Rebuild(userKey *SecretKey) (tarballFile string, err error) {
 
 // rewriteDBFile 覆盖重写数据库文件, 将其更新为当前内存数据库的内容.
 func (db *DB) rewriteDBFile() error {
-	dbFile, err := os.Create(db.fullPath)
+	dbFile, err := os.Create(db.FullPath)
 	if err != nil {
 		return err
 	}
@@ -220,6 +221,11 @@ func (db *DB) deleteByID(id string) (*Mima, error) {
 	return mima, nil
 }
 
+// GetByIndex 为了测试方便.
+func (db *DB) GetByIndex(i int) *Mima {
+	return db.mimaTable[i]
+}
+
 // GetByID 凭 id 找 mima. 忽略 index:0. 只有一种错误: 找不到记录.
 // 为什么找不到时要返回错误不返回 nil? 因为后续需要返回错误, 在这里集中处理更方便.
 func (db *DB) GetByID(id string) (index int, mima *Mima, err error) {
@@ -273,20 +279,20 @@ func (db *DB) GetFormByAlias(alias string) *MimaForm {
 // 主要在 Rebuild 之前使用, 以防万一 rebuild 出错.
 // 为了方便测试返回 tarball 的完整路径.
 func (db *DB) backupToTar(files []string) (filePath string, err error) {
-	filePath = filepath.Join(db.backupDir, newTimestampFilename(TarballExt))
+	filePath = filepath.Join(db.BackupDir, newTimestampFilename(TarballExt))
 	err = tarball.Create(filePath, files)
 	return
 }
 
 // filesToBackup 返回需要备份的文件的完整路径.
 func (db *DB) filesToBackup(fragFiles []string) []string {
-	return append(fragFiles, db.fullPath)
+	return append(fragFiles, db.FullPath)
 }
 
 // getFragPaths 返回数据库碎片文件的完整路径, 并且已排序.
 // 必须确保从小到大排序.
 func (db *DB) getFragPaths() ([]string, error) {
-	pattern := filepath.Join(db.backupDir, "*"+FragExt)
+	pattern := filepath.Join(db.BackupDir, "*"+FragExt)
 	filePaths, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, err
@@ -304,7 +310,7 @@ func (db *DB) Len() int {
 }
 
 func (db *DB) fileNotExist() bool {
-	_, err := os.Stat(db.fullPath)
+	_, err := os.Stat(db.FullPath)
 	if os.IsNotExist(err) {
 		return true
 	}
@@ -314,10 +320,10 @@ func (db *DB) fileNotExist() bool {
 	return false
 }
 
-// readFullPath 读取 db.fullPath, 填充 db.
+// readFullPath 读取 db.FullPath, 填充 db.
 // blankMima 是一个空的 Mima 实体, 它携带着 Mima.Decrypt 的具体实现.
 func (db *DB) readFullPath() (err error) {
-	scanner, file, err := util.NewFileScanner(db.fullPath)
+	scanner, file, err := util.NewFileScanner(db.FullPath)
 	if err != nil {
 		return err
 	}
@@ -345,6 +351,11 @@ func (db *DB) readFullPath() (err error) {
 		db.mimaTable = append(db.mimaTable, mima)
 	}
 	return scanner.Err()
+}
+
+// MimaTable 为了测试方便.
+func (db *DB) MimaTable() []*Mima {
+	return db.mimaTable
 }
 
 // All 返回全部 Mima, 但不包含 index:0, 也不包含已软删除的条目.
@@ -485,7 +496,7 @@ func (db *DB) sealAndWriteFrag(mima *Mima, op Operation) error {
 
 // 把已加密的数据写到一个新文件中 (即生成一个新的数据库碎片).
 func (db *DB) writeFragFile(box64 string) error {
-	fragmentPath := filepath.Join(db.backupDir, newTimestampFilename(FragExt))
+	fragmentPath := filepath.Join(db.BackupDir, newTimestampFilename(FragExt))
 	return writeFile(fragmentPath, box64)
 }
 

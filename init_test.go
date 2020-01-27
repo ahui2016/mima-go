@@ -1,6 +1,7 @@
 package main
 
 import (
+	mimaDB "github.com/ahui2016/mima-go/db"
 	"io/ioutil"
 	"log"
 	"os"
@@ -11,8 +12,9 @@ import (
 // 一个 package 只能有一个 TestMain.
 func TestMain(m *testing.M) {
 	log.Println("Ding!")
-	dbDirPath = filepath.Join(baseDir, TempDir)
-	dbFullPath = filepath.Join(dbDirPath, DBName)
+	dbDirPath := filepath.Join(baseDir, TempDir)
+	dbFullPath := filepath.Join(dbDirPath, DBName)
+	db = mimaDB.NewDB(dbFullPath, dbDirPath)
 	app := m.Run()
 	tempFiles, err := ioutil.ReadDir(dbDirPath)
 	if err != nil {
@@ -42,10 +44,10 @@ func TestPaths(t *testing.T) {
 	if baseDir != exeDir {
 		t.Errorf(baseDir)
 	}
-	if dbDirPath != dbDirForTest {
-		t.Errorf(dbDirPath)
+	if db.BackupDir != dbDirForTest {
+		t.Errorf(db.BackupDir)
 	}
-	if dbFullPath != dbPathForTest {
-		t.Errorf(dbFullPath)
+	if db.FullPath != dbPathForTest {
+		t.Errorf(db.FullPath)
 	}
 }

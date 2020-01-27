@@ -1,4 +1,4 @@
-package main
+package db
 
 // 使用命令 go test -v -o ./mima.exe
 // 注意参数 -o, 用来强制指定文件夹, 如果不使用该参数, 测试有可能使用临时文件夹.
@@ -17,9 +17,9 @@ import (
 	"github.com/ahui2016/mima-go/tarball"
 )
 
-// 用于在测试之前删除旧的数据库文件 (dbFullPath in temp_dir_for_test)
+// 用于在测试之前删除旧的数据库文件
 func removeDB() error {
-	if err := os.Remove(dbFullPath); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(db.FullPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
@@ -28,14 +28,14 @@ func removeDB() error {
 //noinspection NonAsciiCharacters
 func TestMakeFirstMima(t *testing.T) {
 	key := sha256.Sum256([]byte("我是密码"))
-	testDB := NewMimaDB(&key)
+	testDB := mimaDB.NewDB(db.FullPath, db.BackupDir)
 	testDB.Lock()
 	defer testDB.Unlock()
 
 	if err := removeDB(); err != nil {
 		t.Fatal(err)
 	}
-	if err := testDB.MakeFirstMima(); err != nil {
+	if err := testDB.Init(&key); err != nil {
 		t.Fatal(err)
 	}
 
@@ -43,7 +43,7 @@ func TestMakeFirstMima(t *testing.T) {
 	if testDB.Len() != 1 {
 		t.Fatalf("mdb.Items.Len() want: 1, got: %d", testDB.Len())
 	}
-	mima := testDB.Items[0]
+	mima := testDB.GetByIndex(0)
 	if mima == nil {
 		t.Fatal("want a mima, got nil")
 	}
@@ -53,12 +53,13 @@ func TestMakeFirstMima(t *testing.T) {
 	}
 
 	// 检查数据库文件中的 mima 是否正确
-	if _, err := os.Stat(dbFullPath); os.IsNotExist(err) {
-		t.Fatalf("数据库文件 %s 应存在, 但结果不存在", dbFullPath)
+	fullPath := testDB.FullPath
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		t.Fatalf("数据库文件 %s 应存在, 但结果不存在", fullPath)
 	}
-	解密后的数据, err := readAndDecrypt(dbFullPath, &key)
+	解密后的数据, err := readAndDecrypt(fullPath, &key)
 	if err != nil {
-		t.Fatalf("%v: %s", err, dbFullPath)
+		t.Fatalf("%v: %s", err, fullPath)
 	}
 	if !约等于(解密后的数据, mima) {
 		t.Fatal("从数据库文件中恢复的 mima 与内存中的 mima 不一致")
@@ -69,14 +70,14 @@ func TestMakeFirstMima(t *testing.T) {
 // 需要小心处理 sync.RWMutex 的锁
 func TestAddMoreMimas(t *testing.T) {
 	key := sha256.Sum256([]byte("我是密码"))
-	testDB := NewMimaDB(&key)
+	testDB := mimaDB.NewDB(db.FullPath, db.BackupDir)
 
 	if err := removeDB(); err != nil {
 		t.Fatal(err)
 	}
 
 	testDB.Lock()
-	if err := testDB.MakeFirstMima(); err != nil {
+	if err := testDB.Init(&key); err != nil {
 		t.Fatal(err)
 	}
 	testDB.Unlock()
@@ -135,12 +136,12 @@ func TestAddMoreMimas(t *testing.T) {
 	// TestOrderOfDB 确认内存数据库中的条目按升序排列 (老数据在前, 新数据在后).
 	t.Run("TestOrderOfDB", func(t *testing.T) {
 		testDB.RLock()
-		mimaSlice := testDB.Items
+		mimaTable := testDB.MimaTable()
 		testDB.RUnlock()
 
-		for i := 0; i < len(mimaSlice)-1; i++ {
-			a := mimaSlice[i]
-			b := mimaSlice[i+1]
+		for i := 0; i < len(mimaTable)-1; i++ {
+			a := mimaTable[i]
+			b := mimaTable[i+1]
 			if a.UpdatedAt >= b.UpdatedAt {
 				t.Logf("id: %s, Title: %s, id: %s, Title: %s", a.ID, a.Title, b.ID, b.Title)
 				t.Logf("a: %s, b: %s", time.Unix(0, a.UpdatedAt), time.Unix(0, b.UpdatedAt))

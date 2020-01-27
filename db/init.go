@@ -90,9 +90,9 @@ func newTimestampFilename(ext string) string {
 	return name + ext
 }
 
-func readAndDecrypt(fullpath string, key *SecretKey) (mima *Mima, err error) {
+func readAndDecrypt(fullPath string, key *SecretKey) (mima *Mima, err error) {
 	var b []byte
-	if b, err = ioutil.ReadFile(fullpath); err != nil {
+	if b, err = ioutil.ReadFile(fullPath); err != nil {
 		return
 	}
 	box64 := string(b)
