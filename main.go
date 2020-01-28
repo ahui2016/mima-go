@@ -35,8 +35,8 @@ func main() {
 	http.HandleFunc("/edit/", noCache(checkState(editHandler)))
 	http.HandleFunc("/api/new-password", newPassword)
 	http.HandleFunc("/api/delete-history", checkState(deleteHistory))
-	http.HandleFunc("/api/copy-password", checkState(copyInBackground(copyPassword)))
-	http.HandleFunc("/api/copy-username", checkState(copyInBackground(copyUsername)))
+	http.HandleFunc("/api/copy-password", copyInBackground(copyPassword))
+	http.HandleFunc("/api/copy-username", copyInBackground(copyUsername))
 
 	fmt.Println(listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, nil))

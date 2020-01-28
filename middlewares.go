@@ -9,8 +9,7 @@ import (
 func checkState(fn httpHF) httpHF {
 	return func(w httpRW, r httpReq) {
 		if !isLoggedOut() {
-			expired := db.StartedAt.Add(db.ValidTerm)
-			if time.Now().After(expired) {
+			if isExpired() {
 				// 已登入, 但超时.
 				logout()
 				err := &Feedback{Err: errors.New("超时自动登出, 请重新登录")}
@@ -36,6 +35,14 @@ func checkState(fn httpHF) httpHF {
 	}
 }
 
+func isExpired() bool {
+	db.RLock()
+	defer db.RUnlock()
+	expired := db.StartedAt.Add(db.ValidTerm)
+	return time.Now().After(expired)
+}
+
+
 func noCache(fn httpHF) httpHF {
 	return func(w httpRW, r httpReq) {
 		w.Header().Set(
@@ -48,6 +55,16 @@ func noCache(fn httpHF) httpHF {
 
 func copyInBackground(fn func(*Mima)) httpHF {
 	return func(w httpRW, r httpReq) {
+		if !isLoggedOut() && isExpired() {
+			// 已登入, 但超时.
+			logout()
+			http.Error(w, "超时自动登出, 请重新登录", http.StatusNotAcceptable)
+			return
+		}
+		if isLoggedOut() {
+			http.Error(w, "未登入(或已登出)", http.StatusNotAcceptable)
+			return
+		}
 		if r.Method != http.MethodPost {
 			http.Error(w, "不接受 GET 请求, 只接受 POST 请求.", http.StatusNotAcceptable)
 			return
