@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	mimaDB "github.com/ahui2016/mima-go/db"
+	"github.com/atotto/clipboard"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type (
@@ -33,6 +35,8 @@ func main() {
 	http.HandleFunc("/edit/", noCache(checkState(editHandler)))
 	http.HandleFunc("/api/new-password", newPassword)
 	http.HandleFunc("/api/delete-history", checkState(deleteHistory))
+	http.HandleFunc("/api/copy-password", checkState(copyInBackground(copyPassword)))
+	http.HandleFunc("/api/copy-username", checkState(copyInBackground(copyUsername)))
 
 	fmt.Println(listenAddr)
 	log.Fatal(http.ListenAndServe(listenAddr, nil))
@@ -279,7 +283,6 @@ func deleteHistory(w httpRW, r httpReq) {
 	}
 	if err := db.DeleteHistoryItem(id, datetime); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
-		return
 	}
 }
 
@@ -299,6 +302,14 @@ func newPassword(w httpRW, _ httpReq) {
 	_, _ = fmt.Fprint(w, pw)
 }
 
+func copyPassword(mima *Mima) {
+	_ = copyToClipboard(mima.Password)
+}
+
+func copyUsername(mima *Mima) {
+	_ = copyToClipboard(mima.Username)
+}
+
 func checkErr(w httpRW, err error) {
 	if err != nil {
 		log.Println(err)
@@ -312,4 +323,23 @@ func logout() {
 
 func isLoggedOut() bool {
 	return db.IsNotInit()
+}
+
+// 复制到剪贴板, 并在一定时间后清空剪贴板.
+func copyToClipboard(s string) (err error) {
+	if err = clipboard.WriteAll(s); err != nil {
+		return
+	}
+
+	// 三十秒后自动清空剪贴板.
+	<-time.After(time.Second * 30)
+
+	var text string
+	if text, err = clipboard.ReadAll(); err != nil {
+		return
+	}
+	if text == s {
+		return clipboard.WriteAll("")
+	}
+	return nil
 }

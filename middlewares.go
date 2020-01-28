@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"net/http"
 	"time"
 )
 
@@ -42,5 +43,25 @@ func noCache(fn httpHF) httpHF {
 			"no-store, no-cache, must-revalidate",
 		)
 		fn(w, r)
+	}
+}
+
+func copyInBackground(fn func(*Mima)) httpHF {
+	return func(w httpRW, r httpReq) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "不接受 GET 请求, 只接受 POST 请求.", http.StatusNotAcceptable)
+			return
+		}
+		id := r.FormValue("id")
+		_, mima, err := db.GetByID(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		//noinspection GoUnhandledErrorResult
+		go fn(mima)
+		//if err := copyToClipboard(mima.Password); err != nil {
+		//	http.Error(w, err.Error(), http.StatusInternalServerError)
+		//}
 	}
 }
