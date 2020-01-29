@@ -21,6 +21,8 @@ type (
 )
 
 func main() {
+	// 有 checkState 中间件的, 在 checkState 里对数据库加锁;
+	// 没有 checkState 的, 要注意各自加锁.
 	http.HandleFunc("/create-account", noCache(createAccount))
 	http.HandleFunc("/login", noCache(loginHandler))
 	http.HandleFunc("/logout", noCache(logoutHandler))
@@ -69,6 +71,8 @@ func createAccount(w httpRW, r httpReq) {
 }
 
 func loginHandler(w httpRW, r httpReq) {
+	db.Lock()
+	defer db.Unlock()
 	if db.FileNotExist() {
 		// 数据库不存在, 需要创建新账号.
 		checkErr(w, templates.ExecuteTemplate(w, "create-account", nil))
@@ -91,6 +95,11 @@ func loginHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "login", &Feedback{Err: err}))
 		return
 	}
+
+	// 必须更新时间, 这是容易忽略出错的地方.
+	// 如果不更新时间, 会出现 "未登入, 已超时" 的错误.
+	db.StartedAt = time.Now()
+
 	http.Redirect(w, r, "/home/", http.StatusFound)
 }
 

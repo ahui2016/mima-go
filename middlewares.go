@@ -7,6 +7,8 @@ import (
 )
 
 func checkState(fn httpHF) httpHF {
+	db.Lock()
+	defer db.Unlock()
 	return func(w httpRW, r httpReq) {
 		if !isLoggedOut() {
 			if isExpired() {
@@ -18,8 +20,6 @@ func checkState(fn httpHF) httpHF {
 			}
 
 			// 已登入, 未超时, 重新计时.
-			db.Lock()
-			defer db.Unlock()
 			db.StartedAt = time.Now()
 			fn(w, r)
 			return
@@ -54,6 +54,8 @@ func noCache(fn httpHF) httpHF {
 }
 
 func copyInBackground(fn func(*Mima)) httpHF {
+	db.Lock()
+	defer db.Unlock()
 	return func(w httpRW, r httpReq) {
 		if !isLoggedOut() && isExpired() {
 			// 已登入, 但超时.
@@ -75,6 +77,7 @@ func copyInBackground(fn func(*Mima)) httpHF {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+		db.StartedAt = time.Now()
 		//noinspection GoUnhandledErrorResult
 		go fn(mima)
 		//if err := copyToClipboard(mima.Password); err != nil {
