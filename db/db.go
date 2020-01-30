@@ -3,6 +3,7 @@ package db
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -160,10 +161,7 @@ func (db *DB) rewriteDBFile() error {
 			return err
 		}
 	}
-	if err := dbWriter.Flush(); err != nil {
-		return err
-	}
-	return nil
+	return dbWriter.Flush()
 }
 
 // readFragFilesAndUpdate 读取数据库碎片文件, 并根据其内容更新内存数据库.
@@ -277,7 +275,7 @@ func (db *DB) GetFormByAlias(alias string) *MimaForm {
 }
 
 // backupToTar 把数据库文件以及碎片文件备份到一个 tarball 里.
-// 主要在 Rebuild 之前使用, 以防万一 rebuild 出错.
+// 主要在 Rebuild 或 ChangePassword 之前使用, 以防万一出错.
 // 为了方便测试返回 tarball 的完整路径.
 func (db *DB) backupToTar(files []string) (filePath string, err error) {
 	filePath = filepath.Join(db.BackupDir, newTimestampFilename(TarballExt))
@@ -285,7 +283,7 @@ func (db *DB) backupToTar(files []string) (filePath string, err error) {
 	return
 }
 
-// filesToBackup 返回需要备份的文件的完整路径.
+// filesToBackup 返回 Rebuild 前需要备份的文件的完整路径.
 func (db *DB) filesToBackup(fragFiles []string) []string {
 	return append(fragFiles, db.FullPath)
 }
@@ -323,7 +321,7 @@ func (db *DB) FileNotExist() bool {
 
 // readFullPath 读取 db.FullPath, 填充 db.
 // blankMima 是一个空的 Mima 实体, 它携带着 Mima.Decrypt 的具体实现.
-func (db *DB) readFullPath() (err error) {
+func (db *DB) readFullPath() error {
 	scanner, file, err := util.NewFileScanner(db.FullPath)
 	if err != nil {
 		return err
@@ -352,6 +350,70 @@ func (db *DB) readFullPath() (err error) {
 		db.mimaTable = append(db.mimaTable, mima)
 	}
 	return scanner.Err()
+}
+
+// ChangeUserKey 根据新密码更改 db.userKey, 重写 db.FullPath.
+func (db *DB) ChangeUserKey(newPassword string) error {
+	newKey := sha256.Sum256([]byte(newPassword))
+	allBoxes, err := db.generateAllBoxes(&newKey)
+	if err != nil {
+		return err
+	}
+	if _, err = db.backupToTar([]string{db.FullPath}); err != nil {
+		return err
+	}
+	if err = db.writeBoxes(allBoxes); err != nil {return err}
+
+	// 这句应该可以删掉吧? 此时内存中 db.userKey 已经没有用了.
+	// 不能删掉, 因为如果紧接着再修改一次密码, 就会用到.
+	db.userKey = &newKey
+
+	return nil
+}
+
+func (db *DB) EqualToUserKey(key SecretKey) bool {
+	return key == *db.userKey
+}
+
+func (db *DB) writeBoxes(allBoxes []string) error {
+	dbFile, err := os.Create(db.FullPath)
+	if err != nil {
+		return err
+	}
+	//noinspection GoUnhandledErrorResult
+	defer dbFile.Close()
+
+	dbWriter := bufio.NewWriter(dbFile)
+	for _, box64 := range allBoxes {
+		if err := bufWriteln(dbWriter, box64); err != nil {
+			return err
+		}
+	}
+	return dbWriter.Flush()
+}
+
+func (db *DB) generateAllBoxes(newKey *SecretKey) (allBoxes []string, err error) {
+	scanner, file, err := util.NewFileScanner(db.FullPath)
+	if err != nil {
+		return nil, err
+	}
+	//noinspection GoUnhandledErrorResult
+	defer file.Close()
+
+	for scanner.Scan() {
+		box64 := scanner.Text()
+		if len(allBoxes) == 0 {
+			firstMima, err := Decrypt(box64, db.userKey)
+			if err != nil {
+				return nil, fmt.Errorf("用户密码错误: %w", err)
+			}
+			if box64, err = firstMima.Seal(newKey); err != nil {
+				return nil, err
+			}
+		}
+		allBoxes = append(allBoxes, box64)
+	}
+	return allBoxes, scanner.Err()
 }
 
 // MimaTable 为了测试方便.

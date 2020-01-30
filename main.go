@@ -24,6 +24,7 @@ func main() {
 	// 有 checkState 中间件的, 在 checkState 里对数据库加锁;
 	// 没有 checkState 的, 要注意各自加锁.
 	http.HandleFunc("/create-account", noCache(createAccount))
+	http.HandleFunc("/change-password/", noCache(changePassword))
 	http.HandleFunc("/login", noCache(loginHandler))
 	http.HandleFunc("/logout", noCache(logoutHandler))
 	http.HandleFunc("/home/", homeHandler)
@@ -66,8 +67,33 @@ func createAccount(w httpRW, r httpReq) {
 		return
 	}
 	logout()
-	msg := &Feedback{Msg: "成功创建新账号, 请登入"}
-	checkErr(w, templates.ExecuteTemplate(w, "login", msg))
+	info := &Feedback{Info: errors.New("成功创建新账号, 请登入")}
+	checkErr(w, templates.ExecuteTemplate(w, "login", info))
+}
+
+func changePassword(w httpRW, r httpReq) {
+	if isLoggedOut() || db.FileNotExist() {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if r.Method != http.MethodPost {
+		checkErr(w, templates.ExecuteTemplate(w, "change-password", nil))
+		return
+	}
+	oldPwd := r.FormValue("old-pwd")
+	key := sha256.Sum256([]byte(oldPwd))
+	if !db.EqualToUserKey(key) {
+		err := &Feedback{Err: errors.New("当前密码错误, 为了提高安全性必须输入正确的当前密码")}
+		checkErr(w, templates.ExecuteTemplate(w, "change-password", err))
+		return
+	}
+	newPwd := r.FormValue("new-pwd")
+	if err := db.ChangeUserKey(newPwd); err != nil {
+		checkErr(w, templates.ExecuteTemplate(w, "change-password", &Feedback{Err: err}))
+		return
+	}
+	info := &Feedback{Info: errors.New("密码修改成功, 请使用新密码登入")}
+	checkErr(w, templates.ExecuteTemplate(w, "login", info))
 }
 
 func loginHandler(w httpRW, r httpReq) {
@@ -105,8 +131,8 @@ func loginHandler(w httpRW, r httpReq) {
 
 func logoutHandler(w httpRW, _ httpReq) {
 	logout()
-	msg := &Feedback{Msg: "已登出, 请重新登入"}
-	checkErr(w, templates.ExecuteTemplate(w, "login", msg))
+	info := &Feedback{Info: errors.New("已登出, 请重新登入")}
+	checkErr(w, templates.ExecuteTemplate(w, "login", info))
 }
 
 func homeHandler(w httpRW, r httpReq) {
