@@ -92,6 +92,7 @@ func changePassword(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "change-password", &Feedback{Err: err}))
 		return
 	}
+	logout()
 	info := &Feedback{Info: errors.New("密码修改成功, 请使用新密码登入")}
 	checkErr(w, templates.ExecuteTemplate(w, "login", info))
 }
