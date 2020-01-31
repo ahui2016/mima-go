@@ -2,8 +2,11 @@ package main
 
 import (
 	"errors"
+	"flag"
+	"fmt"
 	mimaDB "github.com/ahui2016/mima-go/db"
 	"html/template"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -11,9 +14,6 @@ import (
 // 一些常量
 const (
 	passwordSize = 16
-
-	listenAddr = "127.0.0.1:80"
-
 	tmplDir = "tmpl"
 	DBDir   = "mimadb"
 	DBName  = "mima.db"
@@ -27,7 +27,12 @@ var (
 
 	db *mimaDB.DB
 
-	errMimaDeleted error
+	errMimaDeleted = errors.New("此记录已被删除")
+)
+
+var (
+	localhost = "127.0.0.1"
+	port = flag.Int("port", 10001, "80 <= port <= 65536")
 )
 
 type (
@@ -41,12 +46,11 @@ func init() {
 	baseDir = getBaseDir()
 	dbDirPath := filepath.Join(baseDir, DBDir)
 	dbFullPath := filepath.Join(dbDirPath, DBName)
+
 	db = mimaDB.NewDB(dbFullPath, dbDirPath)
 
 	tmplDirPath = filepath.Join(baseDir, tmplDir)
 	templates = template.Must(template.ParseGlob(filepath.Join(tmplDirPath, "*.html")))
-
-	errMimaDeleted = errors.New("此记录已被删除")
 }
 
 func getBaseDir() string {
@@ -56,4 +60,11 @@ func getBaseDir() string {
 	}
 	path, _ = filepath.EvalSymlinks(path)
 	return filepath.Dir(path)
+}
+
+func getAddr() string {
+	if *port < 80 || *port > 65536 {
+		log.Fatal("out of range: 80 <= port <= 65536")
+	}
+	return fmt.Sprintf("%s:%d", localhost, *port)
 }

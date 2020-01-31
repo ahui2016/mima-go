@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"flag"
 	"fmt"
 	mimaDB "github.com/ahui2016/mima-go/db"
 	"github.com/atotto/clipboard"
@@ -28,6 +29,7 @@ func main() {
 	http.HandleFunc("/login", noCache(loginHandler))
 	http.HandleFunc("/logout", noCache(logoutHandler))
 	http.HandleFunc("/home/", homeHandler)
+	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/index/", noCache(checkState(indexHandler)))
 	http.HandleFunc("/search/", noCache(checkState(searchHandler)))
 	http.HandleFunc("/add/", noCache(checkState(addHandler)))
@@ -41,8 +43,10 @@ func main() {
 	http.HandleFunc("/api/copy-password", copyInBackground(copyPassword))
 	http.HandleFunc("/api/copy-username", copyInBackground(copyUsername))
 
-	fmt.Println(listenAddr)
-	log.Fatal(http.ListenAndServe(listenAddr, nil))
+	flag.Parse()
+	addr := getAddr()
+	fmt.Println(addr)
+	log.Fatal(http.ListenAndServe(addr, nil))
 }
 
 func createAccount(w httpRW, r httpReq) {
@@ -137,7 +141,13 @@ func logoutHandler(w httpRW, _ httpReq) {
 }
 
 func homeHandler(w httpRW, r httpReq) {
-	http.Redirect(w, r, "/search/", http.StatusFound)
+	switch r.URL.Path {
+	case "/": fallthrough
+	case "/home/":
+		http.Redirect(w, r, "/search/", http.StatusFound)
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 func indexHandler(w httpRW, _ httpReq) {
