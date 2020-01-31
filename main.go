@@ -137,7 +137,7 @@ func logoutHandler(w httpRW, _ httpReq) {
 }
 
 func homeHandler(w httpRW, r httpReq) {
-	http.Redirect(w, r, "/index/", http.StatusFound)
+	http.Redirect(w, r, "/search/", http.StatusFound)
 }
 
 func indexHandler(w httpRW, _ httpReq) {
