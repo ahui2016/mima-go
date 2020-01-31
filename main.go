@@ -275,7 +275,8 @@ func undeleteHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
-	checkErr(w, templates.ExecuteTemplate(w, "edit", form))
+	result := &SearchResult{Forms: []*MimaForm{form}}
+	checkErr(w, templates.ExecuteTemplate(w, "search", result))
 }
 
 func deleteForever(w httpRW, r httpReq) {

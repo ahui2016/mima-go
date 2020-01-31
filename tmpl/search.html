@@ -1,6 +1,6 @@
 {{define "search"}}
     {{template "top"}}
-    <p>mima-go .. Search Alias (<a href="/logout">logout</a>)</p>
+    <p>mima-go .. <strong>Search Alias</strong> (<a href="/logout">logout</a>)</p>
 
     <hr/>
 
@@ -20,8 +20,9 @@
     {{if .Err}}
         <p style="font-weight: bold; color: blue">{{.Err}}</p>
     {{end}}
-    {{range .Forms}}
-        <p>
+    <ul style="margin-top: 2em;">
+        {{range .Forms}}
+        <li>
             <strong>{{.Title}}</strong>
             <span class="ButtonsForTitle">
                 {{if .Username}}<a href="#">名</a>{{end}}
@@ -31,8 +32,9 @@
             </span><br/>
             {{if .Alias}}[{{.Alias}}]<br/>{{end}}
             {{if .Username}}{{.Username}}{{end}}
-        </p>
-    {{end}}
+        </li>
+        {{end}}
+    </ul>
 
     <script type="text/javascript">
         const e = document.getElementById("alias");

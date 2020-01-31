@@ -1,9 +1,9 @@
 {{define "delete-forever"}}
     {{template "top"}}
 
-    <p><a href="/home">mima-go</a> .. Delete Forever (彻底删除)</p>
+    <p><a href="/home">mima-go</a> .. <strong>Delete Forever</strong>(彻底删除)</p>
 
-    <hr />
+    <hr style="margin-bottom: 2em;" />
 
     {{if .Err}}
         <p style="font-weight: bold; color: red">
@@ -31,7 +31,7 @@
     {{end}}
 
     {{if .History}}
-        <p>History</p>
+        <p style="margin-top: 2em;">History</p>
         <hr />
         <ul>
             {{range .History}}
