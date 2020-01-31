@@ -150,16 +150,18 @@ func searchHandler(w httpRW, r httpReq) {
 		return
 	}
 	alias := strings.TrimSpace(r.FormValue("alias"))
-	form := new(MimaForm)
 	if alias == "" {
-		form.Info = errors.New(
-			"不可搜索空字符串, 请输入完整的别名, 本程序只能精确搜索, 区分大小写")
-		result := &SearchResult{MimaForm: form}
+		result := &SearchResult{Info: errors.New(
+			"不可搜索空字符串, 请输入完整的别名, 本程序只能精确搜索, 区分大小写"),
+		}
 		checkErr(w, templates.ExecuteTemplate(w, "search", result))
 		return
 	}
-	form = db.GetFormByAlias(alias)
-	result := &SearchResult{SearchText: alias, MimaForm: form}
+	forms := db.GetFormsByAlias(alias)
+	result := &SearchResult{SearchText: alias, Forms: forms}
+	if forms == nil {
+		result.Err = fmt.Errorf("NotFound: 找不到 alias: %s 的记录", alias)
+	}
 	checkErr(w, templates.ExecuteTemplate(w, "search", result))
 }
 
@@ -217,7 +219,7 @@ func editHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
 		return
 	}
-	result := &SearchResult{MimaForm: form}
+	result := &SearchResult{Forms: []*MimaForm{form}}
 	checkErr(w, templates.ExecuteTemplate(w, "search", result))
 }
 
@@ -265,23 +267,13 @@ func undeleteHandler(w httpRW, r httpReq) {
 		return
 	}
 	if r.Method != http.MethodPost {
-		if db.IsAliasConflicts(form.Alias, id) {
-			form.Info = fmt.Errorf(
-				"%w: %s, 如果确认还原此记录, 该 alias 将被清空",
-				mimaDB.ErrAliasConflicts, form.Alias)
-		}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
 	}
-	err := db.UnDeleteByID(id)
-	if err != nil && !errors.Is(err, mimaDB.ErrAliasConflicts) {
+	if err := db.UnDeleteByID(id); err != nil {
 		form = &MimaForm{Err: err}
 		checkErr(w, templates.ExecuteTemplate(w, "undelete", form))
 		return
-	}
-	if errors.Is(err, mimaDB.ErrAliasConflicts) {
-		form.Info = err
-		form.Alias = ""
 	}
 	checkErr(w, templates.ExecuteTemplate(w, "edit", form))
 }

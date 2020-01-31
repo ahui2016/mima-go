@@ -9,7 +9,7 @@ import (
 )
 
 // Mima 用来表示一条记录.
-// 其中, 标题是必须的, 别名是准唯一的, Nonce 是必须且唯一的.
+// 其中, 标题是必须的, Nonce 是必须且唯一的.
 type Mima struct {
 
 	// (主键) (必须) (唯一)
@@ -20,9 +20,8 @@ type Mima struct {
 	// 第一条记录的 Title 长度为零, 其他记录要求 Title 长度大于零.
 	Title string
 
-	// 别名, 用于辅助快速搜索 (准唯一)
-	// 准唯一: 长度为零时允许重复, 长度大于零时要求唯一.
-	// 并且, 回收站里的 (DeletedAt 大于零的) 允许 Alias 重复.
+	// 别名, 用于辅助快速搜索 (允许重复)
+	// 多个条目共用同一个别名, 可模拟一个条目拥有多个密码的情形.
 	// 注意从回收站恢复条目时 (把 DeletedAt 重置为零时), 需要检查 Alias 冲突.
 	Alias string
 
@@ -276,7 +275,9 @@ func (form *MimaForm) IsDeleted() bool {
 
 type SearchResult struct {
 	SearchText string
-	*MimaForm
+	Forms      []*MimaForm
+	Info       error
+	Err        error
 }
 
 type AjaxResponse struct {

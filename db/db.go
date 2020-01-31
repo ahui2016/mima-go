@@ -247,9 +247,9 @@ func (db *DB) GetFormByID(id string) *MimaForm {
 }
 
 // GetByAlias 凭 alias 找 mima, 如果找不到就返回 nil.
-func (db *DB) GetByAlias(alias string) *Mima {
+func (db *DB) GetByAlias(alias string) (mimas []*Mima) {
 	if alias == "" {
-		return nil
+		return
 	}
 	for i := 1; i < db.Len(); i++ {
 		mima := db.mimaTable[i]
@@ -257,21 +257,19 @@ func (db *DB) GetByAlias(alias string) *Mima {
 			continue
 		}
 		if mima.Alias == alias {
-			return mima
+			mimas = append(mimas, mima)
 		}
 	}
-	return nil
+	return
 }
 
-// GetFormByAlias 凭 alias 找 mima, 并转换为 MimaForm 返回.
-// 只有一种错误: 找不到记录, 并且该错误信息已内嵌到 MimaForm 中.
-func (db *DB) GetFormByAlias(alias string) *MimaForm {
-	mima := db.GetByAlias(alias)
-	if mima == nil {
-		err := fmt.Errorf("NotFound: 找不到 alias: %s 的记录", alias)
-		return &MimaForm{Err: err}
+// GetFormsByAlias 凭 alias 找 mima, 并转换为 MimaForm 返回.
+func (db *DB) GetFormsByAlias(alias string) (forms []*MimaForm) {
+	mimas := db.GetByAlias(alias)
+	for _, mima := range mimas {
+		forms = append(forms, mima.ToForm().HideSecrets())
 	}
-	return mima.ToForm().HideSecrets()
+	return
 }
 
 // backupToTar 把数据库文件以及碎片文件备份到一个 tarball 里.
@@ -473,9 +471,6 @@ func (db *DB) Update(form *MimaForm) (err error) {
 	if len(form.Title) == 0 {
 		return errNeedTitle
 	}
-	if db.IsAliasConflicts(form.Alias, form.ID) {
-		return ErrAliasConflicts
-	}
 	i, mima, err := db.GetByID(form.ID)
 	if err != nil {
 		return err
@@ -511,10 +506,6 @@ func (db *DB) UnDeleteByID(id string) (err error) {
 	if err != nil {
 		return err
 	}
-	if db.IsAliasConflicts(mima.Alias, id) {
-		err = fmt.Errorf("%w: %s, 因此该记录的 alias 已被清空", ErrAliasConflicts, mima.Alias)
-		mima.Alias = ""
-	}
 	mima.UnDelete()
 	if err2 := db.sealAndWriteFrag(mima, UnDelete); err2 != nil {
 		return err2
@@ -522,6 +513,7 @@ func (db *DB) UnDeleteByID(id string) (err error) {
 	return
 }
 
+/*
 // IsAliasConflicts 判断 alias 有无冲突.
 // 由于在设计上规定新增记录时不可编辑 alias, 只有在 edit 页面才能编辑 alias,
 // 因此必然有一个本记录的 ID, 在判断冲突时应被排除在外.
@@ -531,22 +523,7 @@ func (db *DB) IsAliasConflicts(alias string, excludedID string) (yes bool) {
 	}
 	return false // No, does not conflict.
 }
-
-func (db *DB) getByAlias(alias string) *Mima {
-	if alias == "" {
-		return nil
-	}
-	for i := 1; i < db.Len(); i++ {
-		mima := db.mimaTable[i]
-		if mima.IsDeleted() {
-			continue
-		}
-		if mima.Alias == alias {
-			return mima
-		}
-	}
-	return nil
-}
+*/
 
 func (db *DB) sealAndWriteFrag(mima *Mima, op Operation) error {
 	mima.Operation = op

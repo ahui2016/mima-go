@@ -29,7 +29,6 @@ const (
 var (
 	FileNotFound      error
 	errNeedTitle      error
-	ErrAliasConflicts error
 )
 
 type (
@@ -40,7 +39,6 @@ type (
 func init() {
 	FileNotFound = errors.New("找不到数据库文件")
 	errNeedTitle = errors.New("'Title' 长度不可为零, 请填写 Title")
-	ErrAliasConflicts = errors.New("该 alias 已存在")
 }
 
 func newRandomKey() SecretKey {

@@ -19,7 +19,8 @@
 
     {{if .Err}}
         <p style="font-weight: bold; color: blue">{{.Err}}</p>
-    {{else if .}}
+    {{end}}
+    {{range .Forms}}
         <p>
             <strong>{{.Title}}</strong>
             <span class="ButtonsForTitle">
