@@ -45,7 +45,9 @@ func main() {
 
 	flag.Parse()
 	addr := getAddr()
-	fmt.Println(addr)
+	term := getTerm()
+	db.ValidTerm = time.Minute * time.Duration(term)
+	fmt.Println(addr, "有效期:", term, "minutes")
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
 

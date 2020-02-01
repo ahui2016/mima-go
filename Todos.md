@@ -1,6 +1,7 @@
 # Todo
 
-- 把 MimaDB 分离出来作为 sub-package.
+- 删除备份文件功能 (自动保留10个) (在 RecycleBin 里放一个链接)
+- 自动关闭时长的命令行参数
 
 ## 特色: Alias
 

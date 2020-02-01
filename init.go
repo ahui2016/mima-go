@@ -32,7 +32,8 @@ var (
 
 var (
 	localhost = "127.0.0.1"
-	port = flag.Int("port", 10001, "80 <= port <= 65536")
+	port = flag.Int("port", 10001, "端口: 80 <= port <= 65536")
+	validTerm = flag.Int("term", 30, "有效期: 1 <= term(minutes) <= 1024")
 )
 
 type (
@@ -67,4 +68,11 @@ func getAddr() string {
 		log.Fatal("out of range: 80 <= port <= 65536")
 	}
 	return fmt.Sprintf("%s:%d", localhost, *port)
+}
+
+func getTerm() int {
+	if *validTerm < 1 || *validTerm > 1024 {
+		log.Fatal("out of range: 1 <= term(minutes) <= 1024")
+	}
+	return *validTerm
 }

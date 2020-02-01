@@ -61,7 +61,7 @@ func NewDB(fullPath, backupDir string) *DB {
 		FullPath:  fullPath,
 		BackupDir: backupDir,
 		StartedAt: time.Now(),
-		ValidTerm: time.Minute * 5,
+		ValidTerm: time.Minute * 30,
 	}
 }
 
