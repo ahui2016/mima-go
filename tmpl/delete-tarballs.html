@@ -1,0 +1,28 @@
+{{define "delete-tarballs"}}
+    {{template "top"}}
+
+    <p><a href="/home">mima-go</a> .. <strong>删除备份文件</strong></p>
+
+    <hr style="margin-bottom: 2em;" />
+
+    {{if .Err}}
+        <p style="font-weight: bold; color: red">
+            Error: {{.Err}}
+        </p>
+    {{else if gt .Number 10}}
+        <form action="/delete-tarballs/" method="POST">
+            <p style="font-weight: bold; color: blue">
+                现有 {{.Number}} 个备份文件, 要删除其中一些备份文件吗? (不可恢复)<br/>
+                (本操作会保留 10 个最新的备份文件) <input type="submit" value="Delete" />
+            </p>
+        </form>
+    {{else}}
+        <p>备份文件不超过 10 个, 不需要删除.</p>
+        <p>(当备份文件超过 10 个时, 本页面会显示删除按钮, 点击按钮即可执行自动删除.)</p>
+        <p>(自动删除的意思是: 删除一部分旧备份文件, 保留 10 个最新的备份文件)</p>
+    {{end}}
+
+    <p><a href="/home">返回首页</a></p>
+
+    {{template "bottom"}}
+{{end}}

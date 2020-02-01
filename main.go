@@ -37,6 +37,7 @@ func main() {
 	http.HandleFunc("/recyclebin/", noCache(checkState(recyclebin)))
 	http.HandleFunc("/undelete/", noCache(checkState(undeleteHandler)))
 	http.HandleFunc("/delete-forever/", noCache(checkState(deleteForever)))
+	http.HandleFunc("/delete-tarballs/", noCache(deleteTarballs))
 	http.HandleFunc("/edit/", noCache(checkState(editHandler)))
 	http.HandleFunc("/api/new-password", newPassword)
 	http.HandleFunc("/api/delete-history", checkState(deleteHistory))
@@ -264,6 +265,26 @@ func deleteHandler(w httpRW, r httpReq) {
 		return
 	}
 	http.Redirect(w, r, "/home/", http.StatusFound)
+}
+
+func deleteTarballs(w httpRW, r httpReq) {
+	fb := new(Feedback)
+	fragFiles, err := db.GetTarballPaths()
+	if err != nil {
+		fb.Err = err
+	}
+	n := len(fragFiles)
+	if r.Method != http.MethodPost {
+		fb.Number = n
+		checkErr(w, templates.ExecuteTemplate(w, "delete-tarballs", fb))
+		return
+	}
+	if n > 10 {
+		if err := mimaDB.DeleteFiles(fragFiles[:n-10]); err != nil {
+			fb.Err = err
+		}
+	}
+	checkErr(w, templates.ExecuteTemplate(w, "delete-tarballs", fb))
 }
 
 func undeleteHandler(w httpRW, r httpReq) {

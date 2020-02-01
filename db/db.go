@@ -131,7 +131,7 @@ func (db *DB) Rebuild(userKey *SecretKey) (tarballFile string, err error) {
 	if err = db.rewriteDBFile(); err != nil {
 		return
 	}
-	err = deleteFiles(fragFiles)
+	err = DeleteFiles(fragFiles)
 	return
 }
 
@@ -289,7 +289,16 @@ func (db *DB) filesToBackup(fragFiles []string) []string {
 // getFragPaths 返回数据库碎片文件的完整路径, 并且已排序.
 // 必须确保从小到大排序.
 func (db *DB) getFragPaths() ([]string, error) {
-	pattern := filepath.Join(db.BackupDir, "*"+FragExt)
+	return db.getPathsByExt(FragExt)
+}
+
+// getTarballPaths 返回备份文件的完整路径, 从小到大排序.
+func (db *DB) GetTarballPaths() ([]string, error) {
+	return db.getPathsByExt(TarballExt)
+}
+
+func (db *DB) getPathsByExt(ext string) ([]string, error) {
+	pattern := filepath.Join(db.BackupDir, "*"+ext)
 	filePaths, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, err

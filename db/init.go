@@ -106,7 +106,7 @@ func bufWriteln(w *bufio.Writer, box64 string) error {
 	return nil
 }
 
-func deleteFiles(filePaths []string) error {
+func DeleteFiles(filePaths []string) error {
 	for _, f := range filePaths {
 		if err := os.Remove(f); err != nil {
 			return err

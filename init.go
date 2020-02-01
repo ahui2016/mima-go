@@ -38,9 +38,7 @@ var (
 
 type (
 	Mima         = mimaDB.Mima
-	Feedback     = mimaDB.Feedback
 	MimaForm     = mimaDB.MimaForm
-	SearchResult = mimaDB.SearchResult
 )
 
 func init() {
