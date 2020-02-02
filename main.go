@@ -43,6 +43,7 @@ func main() {
 	http.HandleFunc("/api/delete-history", checkState(deleteHistory))
 	http.HandleFunc("/api/copy-password", copyInBackground(copyPassword))
 	http.HandleFunc("/api/copy-username", copyInBackground(copyUsername))
+	http.HandleFunc("/api/count-tarballs", countTarballs)
 
 	flag.Parse()
 	addr := getAddr()
@@ -345,6 +346,16 @@ func deleteHistory(w httpRW, r httpReq) {
 	}
 	if err := db.DeleteHistoryItem(id, datetime); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
+	}
+}
+
+func countTarballs(w httpRW, r httpReq) {
+	fragFiles, err := db.GetTarballPaths()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	if len(fragFiles) <= 10 {
+		http.Error(w, "不超过 10 个备份文件, 不需要删除.", http.StatusNotAcceptable)
 	}
 }
 

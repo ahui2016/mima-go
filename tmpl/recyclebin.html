@@ -3,10 +3,11 @@
 
 <p><a href="/home">mima-go</a> .. <strong>Recycle Bin</strong></p>
 
-<hr />
-<p style="text-align:right">
-    <a href="/delete-tarballs">删除备份文件</a>
-</p>
+<div id="more-than-10" style="display: none">
+    <hr />
+    <p style="text-align:right"><a href="/delete-tarballs">删除备份文件</a></p>
+</div>
+<div id="less-than-10" style="display: none"><hr style="margin-bottom: 2em;" /></div>
 
 <ul>
     {{range .}}
@@ -28,5 +29,24 @@
     {{end}}
 </ul>
 
+<script>
+    function countTarballs() {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/count-tarballs');
+        xhr.onload = function () {
+            if (this.status === 200) {
+                document.getElementById('more-than-10').style.display = "block";
+            } else {
+                console.log(xhr.responseText);
+                document.getElementById('less-than-10').style.display = "block";
+            }
+        };
+        xhr.onerror = function () {
+            console.log('出错！获取数据失败。');
+        };
+        xhr.send();
+    }
+    countTarballs();
+</script>
 {{template "bottom"}}
 {{end}}
