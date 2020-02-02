@@ -2,7 +2,7 @@
 {{template "top"}}
 {{template "display-pwd"}}
 
-<p><a href="/home">mima-go</a> .. <strong>Edit</strong></p>
+<p class="top-banner"><a href="/home">mima-go</a> .. <strong>Edit</strong></p>
 
 <hr style="margin-bottom: 2em;" />
 
@@ -13,7 +13,7 @@
 {{end}}
 
 {{ if .ID }}
-<form action="/edit/" method="POST" autocomplete="off">
+<form action="/api/edit" method="POST" autocomplete="off">
   <input type="hidden" name="id" value="{{.ID}}" />
   <label for="Title">Title:</label>
     <input type="text" name="Title" id="Title" class="Fields" autofocus required

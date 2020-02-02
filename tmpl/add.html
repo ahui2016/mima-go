@@ -1,7 +1,7 @@
 {{define "add"}}
 {{template "top"}}
 
-<p><a href="/home">mima-go</a> .. <strong>Add a new item</strong></p>
+<p class="top-banner"><a href="/home">mima-go</a> .. <strong>Add a new item</strong></p>
 
 <hr />
 
@@ -11,7 +11,7 @@
     </p>
 {{end}}
 
-<form action="/add/" method="POST" autocomplete="off">
+<form action="/api/add" method="POST" autocomplete="off">
   <label for="Title">Title:</label>
     <input type="text" name="Title" id="Title" class="Fields" autofocus required
            onblur="this.value = this.value.trim()" />

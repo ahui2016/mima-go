@@ -32,13 +32,15 @@ func main() {
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/index/", noCache(checkState(indexHandler)))
 	http.HandleFunc("/search/", noCache(checkState(searchHandler)))
-	http.HandleFunc("/add/", noCache(checkState(addHandler)))
+	http.HandleFunc("/add/", noCache(checkState(addPage)))
+	http.HandleFunc("/api/add", checkLogin(addHandler))
 	http.HandleFunc("/delete/", noCache(checkState(deleteHandler)))
 	http.HandleFunc("/recyclebin/", noCache(checkState(recyclebin)))
 	http.HandleFunc("/undelete/", noCache(checkState(undeleteHandler)))
 	http.HandleFunc("/delete-forever/", noCache(checkState(deleteForever)))
 	http.HandleFunc("/delete-tarballs/", noCache(deleteTarballs))
-	http.HandleFunc("/edit/", noCache(checkState(editHandler)))
+	http.HandleFunc("/edit/", noCache(checkState(editPage)))
+	http.HandleFunc("/api/edit", checkLogin(editHandler))
 	http.HandleFunc("/api/new-password", newPassword)
 	http.HandleFunc("/api/delete-history", checkState(deleteHistory))
 	http.HandleFunc("/api/copy-password", copyInBackground(copyPassword))
@@ -146,7 +148,8 @@ func logoutHandler(w httpRW, _ httpReq) {
 
 func homeHandler(w httpRW, r httpReq) {
 	switch r.URL.Path {
-	case "/": fallthrough
+	case "/":
+		fallthrough
 	case "/home/":
 		http.Redirect(w, r, "/search/", http.StatusFound)
 	default:
@@ -183,11 +186,11 @@ func recyclebin(w httpRW, _ httpReq) {
 	checkErr(w, templates.ExecuteTemplate(w, "recyclebin", db.DeletedMimas()))
 }
 
+func addPage(w httpRW, _ httpReq) {
+	checkErr(w, templates.ExecuteTemplate(w, "add", nil))
+}
+
 func addHandler(w httpRW, r httpReq) {
-	if r.Method != http.MethodPost {
-		checkErr(w, templates.ExecuteTemplate(w, "add", nil))
-		return
-	}
 	form := &MimaForm{
 		Title:    strings.TrimSpace(r.FormValue("Title")),
 		Username: strings.TrimSpace(r.FormValue("Username")),
@@ -203,21 +206,27 @@ func addHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "add", form))
 		return
 	}
-	http.Redirect(w, r, "/home/", http.StatusFound)
+	result := &SearchResult{Forms: []*MimaForm{form}}
+	checkErr(w, templates.ExecuteTemplate(w, "search", result))
 }
 
-func editHandler(w httpRW, r httpReq) {
+func editPage(w httpRW, r httpReq) {
 	form := new(MimaForm)
 	id, ok := getAndCheckID(w, r, "edit", form)
 	if !ok {
 		return
 	}
 	form = db.GetFormByID(id)
-	if r.Method != http.MethodPost {
-		if form.IsDeleted() {
-			form = &MimaForm{Err: errMimaDeleted}
-		}
-		checkErr(w, templates.ExecuteTemplate(w, "edit", form))
+	if form.IsDeleted() {
+		form = &MimaForm{Err: errMimaDeleted}
+	}
+	checkErr(w, templates.ExecuteTemplate(w, "edit", form))
+}
+
+func editHandler(w httpRW, r httpReq) {
+	form := new(MimaForm)
+	id, ok := getAndCheckID(w, r, "edit", form)
+	if !ok {
 		return
 	}
 	form = &MimaForm{
@@ -349,7 +358,7 @@ func deleteHistory(w httpRW, r httpReq) {
 	}
 }
 
-func countTarballs(w httpRW, r httpReq) {
+func countTarballs(w httpRW, _ httpReq) {
 	fragFiles, err := db.GetTarballPaths()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

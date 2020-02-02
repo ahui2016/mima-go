@@ -1,6 +1,6 @@
 {{define "index"}}
     {{template "top"}}
-    <p>mima-go .. <strong>All</strong> (<a href="/logout">logout</a>)</p>
+    <p class="top-banner">mima-go .. <strong>All</strong> (<a href="/logout">logout</a>)</p>
 
     <hr/>
 
@@ -31,29 +31,6 @@
         {{end}}
     </ul>
 
-    <script>
-        function copyInBackground(data, url) {
-            // https://developer.mozilla.org/en-US/docs/Learn/HTML/Forms/Sending_forms_through_JavaScript
-            const XHR = new XMLHttpRequest();
-            const FD = new FormData();
-            for (const name in data) {
-                if (data.hasOwnProperty(name)) {
-                    FD.append(name, data[name]);
-                }
-            }
-            XHR.onload = function () {
-                if (XHR.status !== 200) {
-                    console.log(XHR.responseText);
-                    window.alert(XHR.responseText);
-                }
-            };
-            XHR.open('POST', url);
-            XHR.onerror = function () {
-                window.alert('出错！获取数据失败。')
-            };
-            XHR.send(FD);
-        }
-    </script>
-
+    {{template "copy-in-background"}}
     {{template "bottom"}}
 {{end}}

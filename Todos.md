@@ -1,6 +1,7 @@
 # Todo
 
-- 只有当有超过 10 个备份文件时, 才在 RecycleBin 里放一个链接
+- Add, Edit 的 POST 操作不验证时间
+- 前后端分离?
 
 ## 特色: Alias
 

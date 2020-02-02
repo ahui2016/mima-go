@@ -10,28 +10,49 @@ func checkState(fn httpHF) httpHF {
 	db.Lock()
 	defer db.Unlock()
 	return func(w httpRW, r httpReq) {
+		// 已登入
 		if !isLoggedOut() {
 			if isExpired() {
-				// 已登入, 但超时.
+				// 超时.
 				logout()
 				err := &Feedback{Err: errors.New("超时自动登出, 请重新登录")}
 				checkErr(w, templates.ExecuteTemplate(w, "login", err))
 				return
 			}
 
-			// 已登入, 未超时, 重新计时.
+			// 未超时, 重新计时.
 			db.StartedAt = time.Now()
 			fn(w, r)
 			return
 		}
 
+		// 数据库不存在, 需要创建新账号.
 		if db.FileNotExist() {
-			// 数据库不存在, 需要创建新账号.
 			checkErr(w, templates.ExecuteTemplate(w, "create-account", nil))
-		} else {
-			// 已存在数据库, 但未登入(已登出)
+			return
+		}
+
+		// 已存在数据库, 但未登入(已登出)
+		checkErr(w, templates.ExecuteTemplate(w, "login", nil))
+	}
+}
+
+func checkLogin(fn httpHF) httpHF {
+	db.Lock()
+	defer db.Unlock()
+	return func(w httpRW, r httpReq) {
+		// 数据库不存在, 需要创建新账号.
+		if db.FileNotExist() {
+			checkErr(w, templates.ExecuteTemplate(w, "create-account", nil))
+			return
+		}
+		// 未登入(已登出)
+		if isLoggedOut() {
 			checkErr(w, templates.ExecuteTemplate(w, "login", nil))
 		}
+		// 已登入
+		fn(w, r)
+		return
 	}
 }
 
@@ -41,7 +62,6 @@ func isExpired() bool {
 	expired := db.StartedAt.Add(db.ValidTerm)
 	return time.Now().After(expired)
 }
-
 
 func noCache(fn httpHF) httpHF {
 	return func(w httpRW, r httpReq) {

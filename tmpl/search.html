@@ -1,6 +1,6 @@
 {{define "search"}}
     {{template "top"}}
-    <p>mima-go .. <strong>Search Alias</strong> (<a href="/logout">logout</a>)</p>
+    <p class="top-banner">mima-go .. <strong>Search Alias</strong> (<a href="/logout">logout</a>)</p>
 
     <hr/>
 
@@ -25,8 +25,8 @@
         <li>
             <strong>{{.Title}}</strong>
             <span class="ButtonsForTitle">
-                {{if .Username}}<a href="#">名</a>{{end}}
-                {{if .Password}}<a href="#">密</a>{{end}}
+                {{if .Username}}<a href="#" onclick="copyInBackground({id:'{{.ID}}'}, '/api/copy-username')">名</a>{{end}}
+                {{if .Password}}<a href="#" onclick="copyInBackground({id:'{{.ID}}'}, '/api/copy-password')">密</a>{{end}}
                 <a href="/edit?id={{.ID}}">改</a>
                 <a href="/delete?id={{.ID}}">删</a>
             </span><br/>
@@ -42,5 +42,6 @@
         e.select();
     </script>
 
+    {{template "copy-in-background"}}
     {{template "bottom"}}
 {{end}}
