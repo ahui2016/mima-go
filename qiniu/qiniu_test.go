@@ -20,9 +20,11 @@ func TestQiniu_createUpToken(t *testing.T) {
 }
 
 func TestQiniu_Upload(t *testing.T) {
-	ret, err := qn.Upload("qiniu.go", true)
-	if err != nil {
-		t.Fatal(err)
+	for _, f := range []string{"qiniu_test.go", "qiniu.go", "qiniu.go", "qiniu.go", "abcd"} {
+		ret, err := qn.Upload(f, true)
+		if err != nil {
+			t.Log(err, f)
+		}
+		t.Log(ret)
 	}
-	t.Log(ret)
 }

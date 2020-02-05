@@ -2,15 +2,11 @@ package qiniu
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/qiniu/api.v7/v7/auth"
 	"github.com/qiniu/api.v7/v7/storage"
+	"log"
 	"path/filepath"
-)
-
-var (
-	ErrBlankUpToken = errors.New("未生成 upToken")
 )
 
 type Qiniu struct {
@@ -34,6 +30,7 @@ func NewQiniu(accessKey, secretKey, bucket, folder string, zone *storage.Region)
 }
 
 func (qn *Qiniu) createUpToken() {
+	log.Println("create a new token")
 	putPolicy := storage.PutPolicy{}
 	if qn.KeyToOverwrite == "" {
 		putPolicy.Scope = qn.bucket
@@ -63,14 +60,20 @@ func (qn *Qiniu) formUpload(localFile string) (ret storage.PutRet, err error) {
 }
 
 // Upload 需要先获取 upToken, 而在获取 upToken 之前要先设置 KeyToOverwrite.
+// 如果 upToken 为空, 则需要获取 upToken,
+// 如果已存在 upToken, 但需要覆盖上传 且 KeyToOverwrite发生了变化, 则也要重新获取 upToken.
 // TODO: 根据错误信息, 重新获取 upToken.
 func (qn *Qiniu) Upload(localFile string, overwrite bool) (ret storage.PutRet, err error) {
+	newKey := fmt.Sprintf("%s/%s", qn.folder, filepath.Base(localFile))
+	oldKey := qn.KeyToOverwrite
 	if overwrite {
-		qn.KeyToOverwrite = fmt.Sprintf("%s/%s", qn.folder, filepath.Base(localFile))
+		qn.KeyToOverwrite = newKey
 	} else {
 		qn.KeyToOverwrite = ""
 	}
 	if qn.upToken == "" {
+		qn.createUpToken()
+	} else if overwrite && (oldKey != newKey) {
 		qn.createUpToken()
 	}
 	return qn.formUpload(localFile)
