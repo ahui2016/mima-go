@@ -2,23 +2,27 @@ package b2
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"net/url"
+	"os"
 )
 
 type ResponseError struct {
 	Status  int
 	Code    string
-	message string
+	Message string
 }
 
 func (err ResponseError) Error() string {
-	return fmt.Sprintf("%d: %s", err.Status, err.Code)
+	return fmt.Sprintf("%d: %s: %s", err.Status, err.Code, err.Message)
 }
 
 type AuthResponse struct {
@@ -32,17 +36,22 @@ type AuthResponse struct {
 
 type Bucket struct {
 	id     string
+	folder string
 	appId  string
 	appKey string
 	auth   *AuthResponse
 }
 
-func NewBucket(id, appId, appKey string) *Bucket {
-	return &Bucket{id, appId, appKey, nil}
+func NewBucket(id, folder, appId, appKey string) *Bucket {
+	return &Bucket{id, folder, appId, appKey, nil}
 }
 
 func (b *Bucket) String() string {
 	return fmt.Sprintf("appId: %s, appKey: %s", b.appId, b.appKey)
+}
+
+func (b *Bucket) Folder() string {
+	return b.folder
 }
 
 // 参考: https://www.backblaze.com/b2/docs/b2_authorize_account.html
@@ -79,6 +88,9 @@ func (b *Bucket) GetUploadUrl() (*UploadUrl, error) {
 		bytes.NewReader(body),
 		map[string]string{"Authorization": b.auth.AuthorizationToken},
 	)
+	if err != nil {
+		return nil, err
+	}
 	uploadUrl := new(UploadUrl)
 	if err := json.Unmarshal(resp, uploadUrl); err != nil {
 		return nil, err
@@ -103,23 +115,39 @@ type UploadResponse struct {
 	UploadTimestamp int64
 }
 
-/*
-func (uu *UploadUrl) UploadFile(filePath string, uploadUrl *UploadUrl) (*UploadResponse, error) {
+func (uu *UploadUrl) UploadFile(filePath, folder string) (*UploadResponse, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
-	data, err := makeRequest(
-		http.MethodPost,
-		uploadUrl.UploadUrl,
-		file,
-		map[string]string{
-			"Authorization": uploadUrl.AuthorizationToken,
-			"X-Bz-File-Name":
-		}
-	)
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	hash := sha1.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return nil, err
+	}
+	//noinspection GoUnhandledErrorResult
+	defer file.Close()
+	headers := map[string]string{
+		"Content-Length": fmt.Sprintf("%d", fileInfo.Size()),
+		//"Authorization": uu.AuthorizationToken,
+		"X-Bz-File-Name": fmt.Sprintf("%s/%s", folder, url.QueryEscape("test test+ok.txt")),
+		"Content-Type": "b2/x-auto",
+		"X-Bz-Content-Sha1": fmt.Sprintf("%x", hash.Sum(nil)),
+	}
+	resp, err := makeRequest(http.MethodPost, uu.UploadUrl, file, headers)
+	if err != nil {
+		return nil, err
+	}
+	uploadResponse := new(UploadResponse)
+	if err := json.Unmarshal(resp, uploadResponse); err != nil {
+		return nil, err
+	}
+	return uploadResponse, nil
 }
-*/
+
 func makeRequest(method, urlPath string, body io.Reader, headers map[string]string) ([]byte, error) {
 	req, err := http.NewRequest(method, urlPath, body)
 	if err != nil {
@@ -128,10 +156,11 @@ func makeRequest(method, urlPath string, body io.Reader, headers map[string]stri
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := new(http.Client).Do(req)
+	resp, err := new(http.Transport).RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
+	log.Println("length:", req.Header.Get("Content-Length"))
 	//noinspection GoUnhandledErrorResult
 	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
