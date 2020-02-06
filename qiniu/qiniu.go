@@ -3,11 +3,18 @@ package qiniu
 import (
 	"context"
 	"fmt"
-	"github.com/qiniu/api.v7/v7/auth"
+	"github.com/qiniu/api.v7/v7/auth/qbox"
 	"github.com/qiniu/api.v7/v7/storage"
-	"log"
 	"path/filepath"
 )
+
+var storageZone = map[string]*storage.Zone{
+	"Huadong":  &storage.ZoneHuadong,
+	"Huabei":   &storage.ZoneHuabei,
+	"Huanan":   &storage.ZoneHuanan,
+	"Beimei":   &storage.ZoneBeimei,
+	"Xinjiapo": &storage.ZoneXinjiapo,
+}
 
 type Qiniu struct {
 	accessKey      string
@@ -19,18 +26,17 @@ type Qiniu struct {
 	KeyToOverwrite string
 }
 
-func NewQiniu(accessKey, secretKey, bucket, folder string, zone *storage.Region) *Qiniu {
+func NewQiniu(accessKey, secretKey, bucket, folder, zone string) *Qiniu {
 	return &Qiniu{
 		accessKey: accessKey,
 		secretKey: secretKey,
 		bucket:    bucket,
 		folder:    folder,
-		zone:      zone,
+		zone:      storageZone[zone],
 	}
 }
 
 func (qn *Qiniu) createUpToken() {
-	log.Println("create a new token")
 	putPolicy := storage.PutPolicy{}
 	if qn.KeyToOverwrite == "" {
 		putPolicy.Scope = qn.bucket
@@ -38,7 +44,7 @@ func (qn *Qiniu) createUpToken() {
 		putPolicy.Scope = fmt.Sprintf("%s:%s", qn.bucket, qn.KeyToOverwrite)
 	}
 	qn.upToken = putPolicy.UploadToken(
-		auth.New(qn.accessKey, qn.secretKey),
+		qbox.NewMac(qn.accessKey, qn.secretKey),
 	)
 }
 
@@ -54,7 +60,7 @@ func (qn *Qiniu) formUpload(localFile string) (ret storage.PutRet, err error) {
 		qn.upToken,
 		fmt.Sprintf("%s/%s", qn.folder, filepath.Base(localFile)),
 		localFile,
-		nil,
+		nil, // 默认开启crc32校验功能
 	)
 	return
 }
