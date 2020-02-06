@@ -31,6 +31,19 @@
   - 只有当本地数据库内容为空时, 才能从云端下载数据, 
     但是, 此时会修改云端文件名前缀 (因此, 再次上传时不会覆盖原来的文件)
 
+### IBM Cloud Storage Service
+
+- 优点:
+  - 有免费额度, 不需要绑定信用卡
+  - 即使收费, 使用量不大时价格也很低 (不设最低消费)
+    There is no minimum fee, so you pay only for what you use.
+  - 国内能直接访问, 速度能接受
+  - 有 Golang SDK
+- 缺点:
+  - 免费的上传次数太少
+  - 闲置一个月会被删除数据?
+    (Lite plan services are deleted after 30 days of inactivity.)
+
 ## Write to file
 
 - The `Fprintln` function takes a `io.writer` as parameter and appends a new line.

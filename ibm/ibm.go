@@ -6,9 +6,13 @@ import (
 	"github.com/IBM/ibm-cos-sdk-go/aws/credentials/ibmiam"
 	"github.com/IBM/ibm-cos-sdk-go/aws/session"
 	"github.com/IBM/ibm-cos-sdk-go/service/s3"
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 )
+
+const authEndpoint = "https://iam.cloud.ibm.com/identity/token"
 
 type COS struct {
 	apiKey            string
@@ -26,11 +30,11 @@ type COS struct {
 	conf *aws.Config
 }
 
-func NewCOS(apiKey, serInsID, authEP, serEP, bucLoc, bucName, prefix string) *COS {
+func NewCOS(apiKey, serInsID, serEP, bucLoc, bucName, prefix string) *COS {
 	return &COS{
 		apiKey:            apiKey,
 		serviceInstanceID: serInsID,
-		authEndpoint:      authEP,
+		authEndpoint:      authEndpoint,
 		serviceEndpoint:   serEP,
 		bucketLocation:    bucLoc,
 		bucketName:        bucName,
@@ -39,8 +43,8 @@ func NewCOS(apiKey, serInsID, authEP, serEP, bucLoc, bucName, prefix string) *CO
 }
 
 func (cos *COS) makeConfig() {
+	log.Println("making config...")
 	cos.conf = aws.NewConfig().
-		//WithRegion("ap-east-1").
 		WithEndpoint(cos.serviceEndpoint).
 		WithCredentials(ibmiam.NewStaticCredentials(
 			aws.NewConfig(), cos.authEndpoint, cos.apiKey, cos.serviceInstanceID)).
@@ -56,6 +60,7 @@ func (cos *COS) uploadFile(localFile string) (*s3.PutObjectOutput, error) {
 	if err != nil {
 		return nil, err
 	}
+	//noinspection GoUnhandledErrorResult
 	defer file.Close()
 
 	sess := session.Must(session.NewSession())
@@ -74,4 +79,28 @@ func (cos *COS) UploadFile(localFile string) (*s3.PutObjectOutput, error) {
 		cos.makeConfig()
 	}
 	return cos.uploadFile(localFile)
+}
+
+func (cos *COS) getObject(name string) (*s3.GetObjectOutput, error) {
+	sess := session.Must(session.NewSession())
+	client := s3.New(sess, cos.conf)
+
+	Input := s3.GetObjectInput{
+		Bucket: aws.String(cos.bucketName),
+		Key:    aws.String(cos.makeObjKey(name)),
+	}
+	return client.GetObject(&Input)
+}
+
+func (cos *COS) GetObject(name string) (objectContents []byte, err error) {
+	if cos.conf == nil {
+		cos.makeConfig()
+	}
+	output, err := cos.getObject(name)
+	if err != nil {
+		return nil, err
+	}
+	//noinspection GoUnhandledErrorResult
+	defer output.Body.Close()
+	return ioutil.ReadAll(output.Body)
 }
