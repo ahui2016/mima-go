@@ -91,7 +91,7 @@ func (db *DB) Init(userKey *SecretKey) error {
 	}
 	mima.ID = ""
 	mima.Password = base64.StdEncoding.EncodeToString(key[:])
-	mima.Notes = randomString()
+	mima.Username = randomString()
 	db.mimaTable = []*Mima{mima}
 	box64, err := mima.Seal(db.userKey) // 第一条记录特殊处理, 用 userKey 加密.
 	if err != nil {
@@ -362,20 +362,69 @@ func (db *DB) readFullPath() error {
 // ChangeUserKey 根据新密码更改 db.userKey, 重写 db.FullPath.
 func (db *DB) ChangeUserKey(newPassword string) error {
 	newKey := sha256.Sum256([]byte(newPassword))
-	allBoxes, err := db.generateAllBoxes(&newKey)
+	allBoxes, err := db.getAllBoxes()
 	if err != nil {
 		return err
 	}
 	if _, err = db.backupToTar([]string{db.FullPath}); err != nil {
 		return err
 	}
-	if err = db.writeBoxes(allBoxes); err != nil {return err}
+
+	// 解密
+	firstMima, err := Decrypt(allBoxes[0], db.userKey)
+	if err != nil {
+		return fmt.Errorf("用户密码错误: %w", err)
+	}
+	// 用新密码重新加密
+	box64, err := firstMima.Seal(&newKey)
+	if err != nil {
+		return err
+	}
+	// 持久化
+	allBoxes[0] = box64
+	if err = db.writeBoxes(allBoxes); err != nil {
+		return err
+	}
 
 	// 这句应该可以删掉吧? 此时内存中 db.userKey 已经没有用了.
 	// 不能删掉, 因为如果紧接着再修改一次密码, 就会用到.
 	db.userKey = &newKey
 
 	return nil
+}
+
+// UpdateSettings 利用 The First Mima 的 Notes 来保存程序的设定, 主要用于云备份.
+// settings 应采用 json 格式, 并且转为 base64 字符串.
+func (db *DB) UpdateSettings(settings string) error {
+	allBoxes, err := db.getAllBoxes()
+	if err != nil {
+		return err
+	}
+	if _, err = db.backupToTar([]string{db.FullPath}); err != nil {
+		return err
+	}
+
+	// 解密
+	firstMima, err := Decrypt(allBoxes[0], db.userKey)
+	if err != nil {
+		return fmt.Errorf("用户密码错误: %w", err)
+	}
+	//修改
+	firstMima.Notes = settings
+	// 重新加密
+	box64, err := firstMima.Seal(db.userKey)
+	if err != nil {
+		return err
+	}
+	// 持久化
+	allBoxes[0] = box64
+	return db.writeBoxes(allBoxes)
+}
+
+// GetSettings 返回本软件的一些设定 (json 格式, 且已被 base64 编码).
+// 利用了 The First Mima 的 Notes 来保存设定. 主要用于云备份.
+func (db *DB) GetSettings() string {
+	return db.GetByIndex(0).Notes
 }
 
 func (db *DB) EqualToUserKey(key SecretKey) bool {
@@ -399,7 +448,8 @@ func (db *DB) writeBoxes(allBoxes []string) error {
 	return dbWriter.Flush()
 }
 
-func (db *DB) generateAllBoxes(newKey *SecretKey) (allBoxes []string, err error) {
+// getAllBoxes 从数据库文件中读取全部数据, 转换为字符串数组.
+func (db *DB) getAllBoxes() (allBoxes []string, err error) {
 	scanner, file, err := util.NewFileScanner(db.FullPath)
 	if err != nil {
 		return nil, err
@@ -409,15 +459,6 @@ func (db *DB) generateAllBoxes(newKey *SecretKey) (allBoxes []string, err error)
 
 	for scanner.Scan() {
 		box64 := scanner.Text()
-		if len(allBoxes) == 0 {
-			firstMima, err := Decrypt(box64, db.userKey)
-			if err != nil {
-				return nil, fmt.Errorf("用户密码错误: %w", err)
-			}
-			if box64, err = firstMima.Seal(newKey); err != nil {
-				return nil, err
-			}
-		}
 		allBoxes = append(allBoxes, box64)
 	}
 	return allBoxes, scanner.Err()

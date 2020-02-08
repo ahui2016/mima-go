@@ -1,0 +1,45 @@
+{{define "setup-ibm"}}
+    {{template "top"}}
+    <p class="top-banner"><a href="/home">mima-go</a> .. <strong>Setup IBM Cloud Storage Service</strong></p>
+
+    <hr style="margin-bottom: 2em;" />
+
+    <ul>
+        <li>注册 IBM Cloud (免费, 无需信用卡, 国内可直接访问)<br/>
+            <a href="https://cloud.ibm.com/registration">https://cloud.ibm.com/registration</a></li>
+        <li>启用 Cloud Storage Service<br/>
+            <a href="https://cloud.ibm.com/catalog/services/cloud-object-storage">https://cloud.ibm.com/catalog/services/cloud-object-storage</a><br/>
+            (需要填写名称时, 如果你有取名困难症, 就用这个名称吧: MyFirstStorage)</li>
+        <li>新建一个 bucket (建议名称: mima-go)<br/>
+            新建后, 在 Buckets 列表里有我们需要的 <strong>Name</strong> 和 <strong>Location</strong>.<br/>
+            点击 View, 再点击 View configuration, 可找到我们需要的 <strong>Endpoint</strong>.</li>
+        <li>从这里 <a href="https://cloud.ibm.com/resources?groups=storage">https://cloud.ibm.com/resources?groups=storage</a> 找到你创建的 MyFirstStorage, 点击进入.<br/>
+            再点击 Service credentials 或者 New credentials, 直接采用默认选项创建 credentials.<br/>
+            然后点击 View credentials, 这里面有我们需要的 <strong>apiKey</strong> 和 <strong>resource_instance_id</strong>.</li>
+    </ul>
+
+    {{if .Info}}
+        <p style="font-weight: bold; color: blue">{{.Info}}</p>
+    {{end}}
+    {{if .Err}}
+        <p style="font-weight: bold; color: red">Error: {{.Err}}</p>
+    {{end}}
+
+    <form action="/setup-ibm" method="POST">
+        <label for="apiKey"><span style="font-weight: bold">apiKey</span>:</label>
+        <input type="text" name="apiKey" id="apiKey" class="Fields" style="width: 20em" autofocus required/>
+        <label for="serviceInstanceID"><span style="font-weight: bold">resource_instance_id</span> (serviceInstanceID):</label>
+        <input type="text" name="serviceInstanceID" id="serviceInstanceID" class="Fields" style="width: 20em" required/>
+        <label for="serviceEndpoint"><span style="font-weight: bold">Endpoint</span> (Public):</label>
+        <input type="text" name="serviceEndpoint" id="serviceEndpoint" class="Fields" style="width: 20em" required/>
+        <label for="bucketLocation">Bucket <span style="font-weight: bold">Location</span>:</label>
+        <input type="text" name="bucketLocation" id="bucketLocation" class="Fields" style="width: 20em" required/>
+        <label for="bucketName">Bucket <span style="font-weight: bold">Name</span>:</label>
+        <input type="text" name="bucketName" id="bucketName" class="Fields" style="width: 20em" required/>
+        <p>
+            <input type="submit" value="Submit"/>
+        </p>
+    </form>
+
+    {{template "bottom"}}
+{{end}}

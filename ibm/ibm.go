@@ -25,7 +25,7 @@ type COS struct {
 	// Object keys can be up to 1024 characters in length, and it's best to avoid
 	// any characters that might be problematic in a web address. For example, ?, =, <,
 	// and other special characters might cause unwanted behavior if not URL-encoded.
-	objKeyPrefix string // 用半角括号括住并加上横杠, 详见 COS.makeObjKey
+	objKeyPrefix string // 用半角括号括住, 详见 COS.makeObjKey
 
 	conf *aws.Config
 }
@@ -52,7 +52,7 @@ func (cos *COS) makeConfig() {
 }
 
 func (cos *COS) makeObjKey(name string) (objectKeyWithPrefix string) {
-	return fmt.Sprintf("(%s)-%s", cos.objKeyPrefix, name)
+	return fmt.Sprintf("(%s)%s", cos.objKeyPrefix, name)
 }
 
 func (cos *COS) uploadFile(localFile string) (*s3.PutObjectOutput, error) {

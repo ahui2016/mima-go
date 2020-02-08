@@ -40,6 +40,7 @@ func main() {
 	http.HandleFunc("/delete-forever/", noCache(checkState(deleteForever)))
 	http.HandleFunc("/delete-tarballs/", noCache(deleteTarballs))
 	http.HandleFunc("/edit/", noCache(checkState(editPage)))
+	http.HandleFunc("/setup-ibm", noCache(checkState(setupIBM)))
 	http.HandleFunc("/api/edit", checkLogin(editHandler))
 	http.HandleFunc("/api/new-password", newPassword)
 	http.HandleFunc("/api/delete-history", checkState(deleteHistory))
@@ -144,6 +145,10 @@ func logoutHandler(w httpRW, _ httpReq) {
 	logout()
 	info := &Feedback{Info: errors.New("已登出, 请重新登入")}
 	checkErr(w, templates.ExecuteTemplate(w, "login", info))
+}
+
+func setupIBM(w httpRW, _ httpReq) {
+	checkErr(w, templates.ExecuteTemplate(w, "setup-ibm", nil))
 }
 
 func homeHandler(w httpRW, r httpReq) {
