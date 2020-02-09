@@ -3,12 +3,14 @@ package db
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/ahui2016/mima-go/tarball"
 	"github.com/ahui2016/mima-go/util"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -145,15 +147,8 @@ func (db *DB) rewriteDBFile() error {
 	defer dbFile.Close()
 
 	dbWriter := bufio.NewWriter(dbFile)
-	for i := 0; i < db.Len(); i++ {
-		var key *SecretKey
-		if i == 0 {
-			key = db.userKey
-		} else {
-			key = db.key
-		}
-		mima := db.mimaTable[i]
-		box64, err := mima.Seal(key)
+	for i, mima := range db.mimaTable {
+		box64, err := mima.Seal(db.Key(i))
 		if err != nil {
 			return err
 		}
@@ -162,6 +157,47 @@ func (db *DB) rewriteDBFile() error {
 		}
 	}
 	return dbWriter.Flush()
+}
+
+// ReadMimaTable 读取内存数据库中的 mimaTable, 把每个 mima 加密并转换为 base64 字符串,
+// 通过 buf 输出. 主要用于云备份.
+func (db *DB) ReadMimaTable() (buf bytes.Buffer, err error) {
+	for i, mima := range db.mimaTable {
+		box64, err := mima.Seal(db.Key(i))
+		if err != nil {
+			return buf, err
+		}
+		if _, err = buf.WriteString(box64 + "\n"); err != nil {
+			return
+		}
+	}
+	return
+}
+
+// EqualByUpdatedAt 用于对比从云端下载回来的数据是否与内存数据库一致.
+func (db *DB) EqualByUpdatedAt(data io.ReadCloser) (bool, error) {
+	scanner := bufio.NewScanner(data)
+	var i int
+	for scanner.Scan() {
+		box64 := scanner.Text()
+		mima, err := Decrypt(box64, db.Key(i))
+		if err != nil {
+			return false, err
+		}
+		if !mima.EqualByUpdatedAt(db.GetByIndex(i)) {
+			return false, nil
+		}
+		i++
+	}
+	return true, scanner.Err()
+}
+
+// Key 根据 i 选择不同的 key. 因为第 0 个 mima 是特殊的, 采用不同的 key.
+func (db *DB) Key(i int) *SecretKey {
+	if i == 0 {
+		return db.userKey
+	}
+	return db.key
 }
 
 // readFragFilesAndUpdate 读取数据库碎片文件, 并根据其内容更新内存数据库.
@@ -375,6 +411,7 @@ func (db *DB) ChangeUserKey(newPassword string) error {
 	if err != nil {
 		return fmt.Errorf("用户密码错误: %w", err)
 	}
+	firstMima.UpdatedAt = time.Now().UnixNano()
 	// 用新密码重新加密
 	box64, err := firstMima.Seal(&newKey)
 	if err != nil {
@@ -411,6 +448,7 @@ func (db *DB) UpdateSettings(settings string) error {
 	}
 	//修改
 	firstMima.Notes = settings
+	firstMima.UpdatedAt = time.Now().UnixNano()
 	// 重新加密
 	box64, err := firstMima.Seal(db.userKey)
 	if err != nil {
@@ -562,18 +600,6 @@ func (db *DB) UnDeleteByID(id string) (err error) {
 	}
 	return
 }
-
-/*
-// IsAliasConflicts 判断 alias 有无冲突.
-// 由于在设计上规定新增记录时不可编辑 alias, 只有在 edit 页面才能编辑 alias,
-// 因此必然有一个本记录的 ID, 在判断冲突时应被排除在外.
-func (db *DB) IsAliasConflicts(alias string, excludedID string) (yes bool) {
-	if m := db.getByAlias(alias); m != nil && m.ID != excludedID {
-		return true // Yes, conflicts.
-	}
-	return false // No, does not conflict.
-}
-*/
 
 func (db *DB) sealAndWriteFrag(mima *Mima, op Operation) error {
 	mima.Operation = op

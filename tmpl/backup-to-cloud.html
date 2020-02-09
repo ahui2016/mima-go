@@ -1,0 +1,22 @@
+{{define "backup-to-cloud"}}
+    {{template "top"}}
+    <p class="top-banner"><a href="/home">mima-go</a> .. <strong>Backup to cloud</strong></p>
+
+    <hr style="margin-bottom: 2em;" />
+
+    {{if .Info}}
+        <p style="font-weight: bold; color: blue">{{.Info}}</p>
+    {{end}}
+    {{if .Err}}
+        <p style="font-weight: bold; color: red">Error: {{.Err}}</p>
+    {{else}}
+        <ul>
+            <li>Cloud Service Name: {{.CloudServiceName}}</li>
+            <li>Bucket Name: {{.BucketName}}</li>
+            <li>Object Name: {{.ObjectName}}</li>
+            <li>Last Modified: {{.LastModified}}</li>
+        </ul>
+    {{end}}
+
+    {{template "bottom"}}
+{{end}}

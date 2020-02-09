@@ -64,9 +64,9 @@ func newNonce() (nonce Nonce, err error) {
 	return
 }
 
-// newID 返回一个由时间戳和随机数组成的 id, 经测试瞬间生成一万个 id 不会重复.
+// NewID 返回一个由时间戳和随机数组成的 id, 经测试瞬间生成一万个 id 不会重复.
 // 由于时间戳的精度为秒, 因此如果两次生成 id 之间超过一秒, 则绝对不会重复.
-func newID() (id string, err error) {
+func NewID() (id string, err error) {
 	var max int64 = 100_000_000
 	n, err := rand.Int(rand.Reader, big.NewInt(max))
 	if err != nil {
@@ -97,8 +97,6 @@ func readAndDecrypt(fullPath string, key *SecretKey) (mima *Mima, err error) {
 	return Decrypt(box64, key)
 }
 
-// bufWriteln 主要用于把已加密的 box 逐行写入文件 (添加换行符).
-// 因为二进制数据会与换行符冲突, 因此这里需要把二进制数据转换为 base64.
 func bufWriteln(w *bufio.Writer, box64 string) error {
 	if _, err := w.WriteString(box64 + "\n"); err != nil {
 		return err

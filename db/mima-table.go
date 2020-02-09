@@ -49,7 +49,7 @@ func NewMima(title string) (*Mima, error) {
 		return nil, err
 	}
 	mima := new(Mima)
-	if mima.ID, err = newID(); err != nil {
+	if mima.ID, err = NewID(); err != nil {
 		return nil, err
 	}
 	mima.Title = title
@@ -176,6 +176,11 @@ func (mima *Mima) equalToForm(form *MimaForm) bool {
 	s1 := mima.Title + mima.Username + mima.Password + mima.Notes
 	s2 := form.Title + form.Username + form.Password + form.Notes
 	return s1 == s2
+}
+
+// EqualByUpdatedAt 检查两个 mima 的更新日期是否一致.
+func (mima *Mima) EqualByUpdatedAt(other *Mima) bool {
+	return mima.UpdatedAt == other.UpdatedAt
 }
 
 func (mima *Mima) makeHistory(updatedAt int64) error {

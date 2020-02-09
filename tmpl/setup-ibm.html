@@ -18,24 +18,21 @@
             然后点击 View credentials, 这里面有我们需要的 <strong>apiKey</strong> 和 <strong>resource_instance_id</strong>.</li>
     </ul>
 
-    {{if .Info}}
-        <p style="font-weight: bold; color: blue">{{.Info}}</p>
-    {{end}}
-    {{if .Err}}
-        <p style="font-weight: bold; color: red">Error: {{.Err}}</p>
+    {{if .ErrMsg}}
+        <p style="font-weight: bold; color: red">Error: {{.ErrMsg}}</p>
     {{end}}
 
     <form action="/setup-ibm" method="POST">
         <label for="apiKey"><span style="font-weight: bold">apiKey</span>:</label>
-        <input type="text" name="apiKey" id="apiKey" class="Fields" style="width: 20em" autofocus required/>
+        <input type="text" name="apiKey" id="apiKey" class="Fields" style="width: 20em" value="{{.ApiKey}}" autofocus required/>
         <label for="serviceInstanceID"><span style="font-weight: bold">resource_instance_id</span> (serviceInstanceID):</label>
-        <input type="text" name="serviceInstanceID" id="serviceInstanceID" class="Fields" style="width: 20em" required/>
+        <input type="text" name="serviceInstanceID" id="serviceInstanceID" class="Fields" style="width: 20em" value="{{.ServiceInstanceID}}" required/>
         <label for="serviceEndpoint"><span style="font-weight: bold">Endpoint</span> (Public):</label>
-        <input type="text" name="serviceEndpoint" id="serviceEndpoint" class="Fields" style="width: 20em" required/>
+        <input type="text" name="serviceEndpoint" id="serviceEndpoint" class="Fields" style="width: 20em" value="{{.ServiceEndpoint}}" required/>
         <label for="bucketLocation">Bucket <span style="font-weight: bold">Location</span>:</label>
-        <input type="text" name="bucketLocation" id="bucketLocation" class="Fields" style="width: 20em" required/>
+        <input type="text" name="bucketLocation" id="bucketLocation" class="Fields" style="width: 20em" value="{{.BucketLocation}}" required/>
         <label for="bucketName">Bucket <span style="font-weight: bold">Name</span>:</label>
-        <input type="text" name="bucketName" id="bucketName" class="Fields" style="width: 20em" required/>
+        <input type="text" name="bucketName" id="bucketName" class="Fields" style="width: 20em" value="{{.BucketName}}" required/>
         <p>
             <input type="submit" value="Submit"/>
         </p>

@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	mimaDB "github.com/ahui2016/mima-go/db"
+	"github.com/ahui2016/mima-go/ibm"
 	"github.com/atotto/clipboard"
 	"log"
 	"net/http"
@@ -41,6 +42,7 @@ func main() {
 	http.HandleFunc("/delete-tarballs/", noCache(deleteTarballs))
 	http.HandleFunc("/edit/", noCache(checkState(editPage)))
 	http.HandleFunc("/setup-ibm", noCache(checkState(setupIBM)))
+	http.HandleFunc("/backup-to-cloud/", noCache(checkState(backupToCloud)))
 	http.HandleFunc("/api/edit", checkLogin(editHandler))
 	http.HandleFunc("/api/new-password", newPassword)
 	http.HandleFunc("/api/delete-history", checkState(deleteHistory))
@@ -147,8 +149,81 @@ func logoutHandler(w httpRW, _ httpReq) {
 	checkErr(w, templates.ExecuteTemplate(w, "login", info))
 }
 
-func setupIBM(w httpRW, _ httpReq) {
-	checkErr(w, templates.ExecuteTemplate(w, "setup-ibm", nil))
+func setupIBM(w httpRW, r httpReq) {
+	if r.Method != http.MethodPost {
+		checkErr(w, templates.ExecuteTemplate(w, "setup-ibm", nil))
+		return
+	}
+	prefix, err := mimaDB.NewID()
+	settings := Settings{
+		ApiKey:            r.FormValue("apiKey"),
+		ServiceInstanceID: r.FormValue("serviceInstanceID"),
+		ServiceEndpoint:   r.FormValue("serviceEndpoint"),
+		BucketLocation:    r.FormValue("bucketLocation"),
+		BucketName:        r.FormValue("bucketName"),
+		ObjKeyPrefix:      prefix,
+	}
+	if err != nil {
+		checkErrForSetupIBM(w, err.Error(), &settings)
+		return
+	}
+	cos := ibm.NewCOS(settings.ApiKey, settings.ServiceInstanceID, settings.ServiceEndpoint,
+		settings.BucketLocation, settings.BucketName, settings.ObjKeyPrefix)
+
+	buf, err := db.ReadMimaTable()
+	if err != nil {
+		checkErrForSetupIBM(w, err.Error(), &settings)
+		return
+	}
+	// 尝试备份到云端
+	if _, err := cos.Upload(DBName, &buf); err != nil {
+		checkErrForSetupIBM(w, err.Error(), &settings)
+		return
+	}
+	// 尝试从云端获取数据
+	data, err := cos.GetObjectBody(DBName)
+	if err != nil {
+		checkErrForSetupIBM(w, err.Error(), &settings)
+		return
+	}
+	//noinspection GoUnhandledErrorResult
+	defer data.Close()
+	// 检查从云端获取回来的数据与内存数据库是否一致 (只检查 UpdatedAt)
+	ok, err := db.EqualByUpdatedAt(data)
+	if err != nil {
+		checkErrForSetupIBM(w, err.Error(), &settings)
+		return
+	}
+	if !ok {
+		checkErrForSetupIBM(w, "把内存数据库上传到云端, 再下载回来后, 与内存数据库不一致.", &settings)
+		return
+	}
+	lastModified, err := cos.GetLastModified("ibm_test.go")
+	if err != nil {
+		info := CloudInfo{Err: err.Error()}
+		checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &info))
+		return
+	}
+	cloudInfo := CloudInfo{
+		CloudServiceName: "IBM Cloud Object Storage",
+		BucketName:       settings.BucketName,
+		ObjectName:       cos.MakeObjKey(DBName),
+		LastModified:     lastModified,
+		Info:             "云备份设置成功! 并且已备份一次, 云端备份信息如下所示:",
+	}
+	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &cloudInfo))
+}
+
+func checkErrForSetupIBM(w httpRW, errMsg string, settings *Settings) {
+	settings.ErrMsg = errMsg
+	checkErr(w, templates.ExecuteTemplate(w, "setup-ibm", settings))
+}
+
+func backupToCloud(w httpRW, r httpReq) {
+	settings := db.GetSettings()
+	if len(settings) == 0 {
+		http.Redirect(w, r, "/setup-ibm", http.StatusFound)
+	}
 }
 
 func homeHandler(w httpRW, r httpReq) {
