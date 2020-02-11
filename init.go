@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	mimaDB "github.com/ahui2016/mima-go/db"
+	"github.com/ahui2016/mima-go/ibm"
 	"html/template"
 	"log"
 	"os"
@@ -14,10 +17,10 @@ import (
 // 一些常量
 const (
 	passwordSize = 16
-	tmplDir = "tmpl"
-	DBDir   = "mimadb"
-	DBName  = "mima.db"
-	TempDir = "temp_dir_for_test"
+	tmplDir      = "tmpl"
+	DBDir        = "mimadb"
+	DBName       = "mima.db"
+	TempDir      = "temp_dir_for_test"
 )
 
 var (
@@ -25,20 +28,21 @@ var (
 	tmplDirPath string
 	templates   *template.Template
 
-	db *mimaDB.DB
+	db  *mimaDB.DB
+	cos *ibm.COS
 
 	errMimaDeleted = errors.New("此记录已被删除")
 )
 
 var (
 	localhost = "127.0.0.1"
-	port = flag.Int("port", 10001, "端口: 80 <= port <= 65536")
+	port      = flag.Int("port", 10001, "端口: 80 <= port <= 65536")
 	validTerm = flag.Int("term", 30, "有效期: 1 <= term(minutes) <= 1024")
 )
 
 type (
-	Mima         = mimaDB.Mima
-	MimaForm     = mimaDB.MimaForm
+	Mima     = mimaDB.Mima
+	MimaForm = mimaDB.MimaForm
 )
 
 func init() {
@@ -73,4 +77,25 @@ func getTerm() int {
 		log.Fatal("out of range: 1 <= term(minutes) <= 1024")
 	}
 	return *validTerm
+}
+
+// makeCOS 生成一个 COS 并保存到全局变量 cos 中.
+func makeCOS(settings64 string) error {
+	settings, err := NewSettingsFromJSON64(settings64)
+	if err != nil {
+		return err
+	}
+	log.Println(*settings)
+	cos = ibm.NewCOS(settings.ApiKey, settings.ServiceInstanceID, settings.ServiceEndpoint,
+		settings.BucketLocation, settings.BucketName, settings.ObjKeyPrefix)
+	return nil
+}
+
+func updateSettings(settings Settings) error {
+	settingsJson, err := json.Marshal(settings)
+	if err != nil {
+		return err
+	}
+	settings64 := base64.StdEncoding.EncodeToString(settingsJson)
+	return db.UpdateSettings(settings64)
 }

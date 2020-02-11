@@ -1,6 +1,10 @@
 package main
 
-import "time"
+import (
+	"encoding/base64"
+	"encoding/json"
+	"time"
+)
 
 type SearchResult struct {
 	SearchText string
@@ -46,4 +50,14 @@ type CloudInfo struct {
 	LastModified     *time.Time
 	Err              string
 	Info             string
+}
+
+func NewSettingsFromJSON64(settings64 string) (*Settings, error) {
+	settingsJSON, err := base64.StdEncoding.DecodeString(settings64)
+	if err != nil {
+		return nil, err
+	}
+	settings := new(Settings)
+	err = json.Unmarshal(settingsJSON, settings)
+	return settings, err
 }

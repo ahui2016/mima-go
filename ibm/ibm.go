@@ -17,12 +17,12 @@ import (
 const authEndpoint = "https://iam.cloud.ibm.com/identity/token"
 
 type COS struct {
-	apiKey            string
-	serviceInstanceID string // resource_instance_id
-	authEndpoint      string
-	serviceEndpoint   string
-	bucketLocation    string
-	bucketName        string
+	ApiKey            string
+	ServiceInstanceID string // resource_instance_id
+	AuthEndpoint      string
+	ServiceEndpoint   string
+	BucketLocation    string
+	BucketName        string
 
 	// Object keys can be up to 1024 characters in length, and it's best to avoid
 	// any characters that might be problematic in a web address. For example, ?, =, <,
@@ -35,12 +35,12 @@ type COS struct {
 
 func NewCOS(apiKey, serInsID, serEP, bucLoc, bucName, prefix string) *COS {
 	return &COS{
-		apiKey:            apiKey,
-		serviceInstanceID: serInsID,
-		authEndpoint:      authEndpoint,
-		serviceEndpoint:   serEP,
-		bucketLocation:    bucLoc,
-		bucketName:        bucName,
+		ApiKey:            apiKey,
+		ServiceInstanceID: serInsID,
+		AuthEndpoint:      authEndpoint,
+		ServiceEndpoint:   serEP,
+		BucketLocation:    bucLoc,
+		BucketName:        bucName,
 		objKeyPrefix:      prefix,
 	}
 }
@@ -48,9 +48,9 @@ func NewCOS(apiKey, serInsID, serEP, bucLoc, bucName, prefix string) *COS {
 func (cos *COS) makeConfig() {
 	log.Println("making config...")
 	cos.conf = aws.NewConfig().
-		WithEndpoint(cos.serviceEndpoint).
+		WithEndpoint(cos.ServiceEndpoint).
 		WithCredentials(ibmiam.NewStaticCredentials(
-			aws.NewConfig(), cos.authEndpoint, cos.apiKey, cos.serviceInstanceID)).
+			aws.NewConfig(), cos.AuthEndpoint, cos.ApiKey, cos.ServiceInstanceID)).
 		WithS3ForcePathStyle(true)
 
 	sess := session.Must(session.NewSession())
@@ -86,7 +86,7 @@ func (cos *COS) upload(objName string, objBody io.ReadSeeker) (*s3.PutObjectOutp
 	client := s3.New(sess, cos.conf)
 
 	input := s3.PutObjectInput{
-		Bucket: aws.String(cos.bucketName),
+		Bucket: aws.String(cos.BucketName),
 		Key: aws.String(cos.MakeObjKey(objName)),
 		Body: objBody,
 	}
@@ -97,7 +97,7 @@ func (cos *COS) upload(objName string, objBody io.Reader) (*s3manager.UploadOutp
 	sess := session.Must(session.NewSession(cos.conf))
 	uploader := s3manager.NewUploader(sess)
 	return uploader.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(cos.bucketName),
+		Bucket: aws.String(cos.BucketName),
 		Key:    aws.String(cos.MakeObjKey(objName)),
 		Body:   objBody,
 	})
@@ -112,7 +112,7 @@ func (cos *COS) Upload(objName string, objBody io.Reader) (*s3manager.UploadOutp
 
 func (cos *COS) getObject(name string) (*s3.GetObjectOutput, error) {
 	input := s3.GetObjectInput{
-		Bucket: aws.String(cos.bucketName),
+		Bucket: aws.String(cos.BucketName),
 		Key:    aws.String(cos.MakeObjKey(name)),
 	}
 	return cos.client.GetObject(&input)
@@ -132,7 +132,7 @@ func (cos *COS) GetObjectBody(name string) (io.ReadCloser, error) {
 
 func (cos *COS) listObjects() (*s3.ListObjectsV2Output, error) {
 	input := &s3.ListObjectsV2Input{
-		Bucket:            aws.String(cos.bucketName),
+		Bucket:            aws.String(cos.BucketName),
 		Prefix:            aws.String(fmt.Sprintf("(%s)", cos.objKeyPrefix)),
 	}
 	return cos.client.ListObjectsV2(input)

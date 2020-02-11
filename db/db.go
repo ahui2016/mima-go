@@ -162,10 +162,10 @@ func (db *DB) rewriteDBFile() error {
 // ReadMimaTable 读取内存数据库中的 mimaTable, 把每个 mima 加密并转换为 base64 字符串,
 // 通过 buf 输出. 主要用于云备份.
 func (db *DB) ReadMimaTable() (buf bytes.Buffer, err error) {
+	var box64 string
 	for i, mima := range db.mimaTable {
-		box64, err := mima.Seal(db.Key(i))
-		if err != nil {
-			return buf, err
+		if box64, err = mima.Seal(db.Key(i)); err != nil {
+			return
 		}
 		if _, err = buf.WriteString(box64 + "\n"); err != nil {
 			return
@@ -449,6 +449,8 @@ func (db *DB) UpdateSettings(settings string) error {
 	//修改
 	firstMima.Notes = settings
 	firstMima.UpdatedAt = time.Now().UnixNano()
+	db.GetByIndex(0).Notes = settings
+	db.GetByIndex(0).UpdatedAt = firstMima.UpdatedAt
 	// 重新加密
 	box64, err := firstMima.Seal(db.userKey)
 	if err != nil {
@@ -457,6 +459,10 @@ func (db *DB) UpdateSettings(settings string) error {
 	// 持久化
 	allBoxes[0] = box64
 	return db.writeBoxes(allBoxes)
+}
+
+func (db *DB) HasSettings() bool {
+	return len(db.mimaTable[0].Notes) > 0
 }
 
 // GetSettings 返回本软件的一些设定 (json 格式, 且已被 base64 编码).

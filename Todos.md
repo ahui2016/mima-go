@@ -3,7 +3,7 @@
 - 多账号?
 - 云储存
 - 前后端分离?
-- 自动打开网页
+- 自动打开网页 (systray?)
 
 ## 特色: Alias
 
@@ -40,6 +40,7 @@
     There is no minimum fee, so you pay only for what you use.
   - 国内能直接访问, 速度能接受
   - 有 Golang SDK
+  - 符合 Amazon S3 标准, 后续可轻松转移平台
 - 缺点:
   - 免费的上传次数太少
   - 闲置一个月会被删除数据?

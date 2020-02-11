@@ -156,18 +156,18 @@ func setupIBM(w httpRW, r httpReq) {
 	}
 	prefix, err := mimaDB.NewID()
 	settings := Settings{
-		ApiKey:            r.FormValue("apiKey"),
-		ServiceInstanceID: r.FormValue("serviceInstanceID"),
-		ServiceEndpoint:   r.FormValue("serviceEndpoint"),
-		BucketLocation:    r.FormValue("bucketLocation"),
-		BucketName:        r.FormValue("bucketName"),
+		ApiKey:            strings.TrimSpace(r.FormValue("apiKey")),
+		ServiceInstanceID: strings.TrimSpace(r.FormValue("serviceInstanceID")),
+		ServiceEndpoint:   strings.TrimSpace(r.FormValue("serviceEndpoint")),
+		BucketLocation:    strings.TrimSpace(r.FormValue("bucketLocation")),
+		BucketName:        strings.TrimSpace(r.FormValue("bucketName")),
 		ObjKeyPrefix:      prefix,
 	}
 	if err != nil {
 		checkErrForSetupIBM(w, err.Error(), &settings)
 		return
 	}
-	cos := ibm.NewCOS(settings.ApiKey, settings.ServiceInstanceID, settings.ServiceEndpoint,
+	cos = ibm.NewCOS(settings.ApiKey, settings.ServiceInstanceID, settings.ServiceEndpoint,
 		settings.BucketLocation, settings.BucketName, settings.ObjKeyPrefix)
 
 	buf, err := db.ReadMimaTable()
@@ -198,7 +198,13 @@ func setupIBM(w httpRW, r httpReq) {
 		checkErrForSetupIBM(w, "把内存数据库上传到云端, 再下载回来后, 与内存数据库不一致.", &settings)
 		return
 	}
-	lastModified, err := cos.GetLastModified("ibm_test.go")
+	// 更新设置 (持久化)
+	if err := updateSettings(settings); err != nil {
+		checkErrForSetupIBM(w, err.Error(), &settings)
+		return
+	}
+	// 显示成功信息
+	lastModified, err := cos.GetLastModified(DBName)
 	if err != nil {
 		info := CloudInfo{Err: err.Error()}
 		checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &info))
@@ -220,10 +226,30 @@ func checkErrForSetupIBM(w httpRW, errMsg string, settings *Settings) {
 }
 
 func backupToCloud(w httpRW, r httpReq) {
-	settings := db.GetSettings()
-	if len(settings) == 0 {
+	if !db.HasSettings() {
 		http.Redirect(w, r, "/setup-ibm", http.StatusFound)
+		return
 	}
+	if cos == nil {
+		if err := makeCOS(db.GetSettings()); err != nil {
+			err := CloudInfo{Err: err.Error()}
+			checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &err))
+			return
+		}
+	}
+	lastModified, err := cos.GetLastModified(DBName)
+	if err != nil {
+		info := CloudInfo{Err: err.Error()}
+		checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &info))
+		return
+	}
+	cloudInfo := CloudInfo{
+		CloudServiceName: "IBM Cloud Object Storage",
+		BucketName:       cos.BucketName,
+		ObjectName:       cos.MakeObjKey(DBName),
+		LastModified:     lastModified,
+	}
+	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &cloudInfo))
 }
 
 func homeHandler(w httpRW, r httpReq) {
