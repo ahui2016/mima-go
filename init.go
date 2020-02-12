@@ -85,7 +85,6 @@ func makeCOS(settings64 string) error {
 	if err != nil {
 		return err
 	}
-	log.Println(*settings)
 	cos = ibm.NewCOS(settings.ApiKey, settings.ServiceInstanceID, settings.ServiceEndpoint,
 		settings.BucketLocation, settings.BucketName, settings.ObjKeyPrefix)
 	return nil

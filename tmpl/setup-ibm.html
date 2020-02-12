@@ -34,7 +34,7 @@
         <label for="bucketName">Bucket <span style="font-weight: bold">Name</span>:</label>
         <input type="text" name="bucketName" id="bucketName" class="Fields" style="width: 20em" value="{{.BucketName}}" required/>
         <p>
-            <input type="submit" value="Submit"/>
+            <input type="submit" value="Submit" onclick="this.value='loading...';this.setAttribute('disabled','');"/>
         </p>
     </form>
 
