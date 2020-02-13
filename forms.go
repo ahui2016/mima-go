@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
-	"time"
 )
 
 type SearchResult struct {
@@ -47,7 +46,7 @@ type CloudInfo struct {
 	CloudServiceName string
 	BucketName       string
 	ObjectName       string
-	LastModified     *time.Time
+	LastModified     string
 	Err              string
 	Info             string
 }

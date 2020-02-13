@@ -2,10 +2,7 @@
     {{template "top"}}
     <p class="top-banner"><a href="/home">mima-go</a> .. <strong>Backup to cloud</strong></p>
 
-    <hr />
-    <p style="text-align:right">
-        <a href="/setup-cloud">Setup Cloud</a>
-    </p>
+    <hr style="margin-bottom: 2em;" />
 
     {{if .Info}}
         <p style="font-weight: bold; color: blue">{{.Info}}</p>
@@ -14,15 +11,15 @@
         <p style="font-weight: bold; color: red">Error: {{.Err}}</p>
     {{else}}
         <ul>
-            <li>Cloud Service Name: {{.CloudServiceName}}</li>
-            <li>Bucket Name: {{.BucketName}}</li>
-            <li>Object Name: {{.ObjectName}}</li>
-            <li>Last Modified: {{.LastModified}}</li>
+            <li>Cloud Service: <u>{{.CloudServiceName}}</u></li>
+            <li>Bucket Name: <u>{{.BucketName}}</u></li>
+            <li>Object Name: <u>{{.ObjectName}}</u></li>
+            <li>Last Backup: <u>{{.LastModified}}</u></li>
         </ul>
     {{end}}
 
-    <form action="/backup-to-cloud" method="post">
-        <input type="submit" value="Backup" />
+    <form action="/backup-to-cloud/" method="post">
+        <input type="submit" value="Backup" onclick="this.value='loading...';this.setAttribute('disabled','')" />
     </form>
 
     {{template "bottom"}}

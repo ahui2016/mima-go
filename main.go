@@ -43,6 +43,7 @@ func main() {
 	http.HandleFunc("/setup-ibm", noCache(checkState(setupIBM)))
 	http.HandleFunc("/setup-cloud", noCache(checkState(setupIBM)))
 	http.HandleFunc("/backup-to-cloud/", noCache(checkState(backupToCloud)))
+	http.HandleFunc("/backup-to-cloud-loading/", noCache(backupToCloudLoading))
 	http.HandleFunc("/api/edit", checkLogin(editHandler))
 	http.HandleFunc("/api/new-password", newPassword)
 	http.HandleFunc("/api/delete-history", checkState(deleteHistory))
@@ -205,6 +206,10 @@ func checkErrForBackupToCloud(w httpRW, errMsg string) {
 	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &err))
 }
 
+func backupToCloudLoading(w httpRW, _ httpReq) {
+	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud-loading", nil))
+}
+
 func backupToCloud(w httpRW, r httpReq) {
 	if !db.HasSettings() {
 		http.Redirect(w, r, "/setup-cloud", http.StatusFound)
@@ -241,7 +246,7 @@ func getCloudInfo() *CloudInfo {
 		CloudServiceName: "IBM Cloud Object Storage",
 		BucketName:       cos.BucketName,
 		ObjectName:       cos.MakeObjKey(DBName),
-		LastModified:     lastModified,
+		LastModified:     lastModified.Local().Format(mimaDB.DateTimeFormat),
 	}
 }
 
@@ -326,6 +331,7 @@ func addHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "add", form))
 		return
 	}
+	form.ID = mima.ID
 	result := &SearchResult{Forms: []*MimaForm{form}}
 	checkErr(w, templates.ExecuteTemplate(w, "search", result))
 }
