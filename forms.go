@@ -38,6 +38,9 @@ type Settings struct {
 	// and other special characters might cause unwanted behavior if not URL-encoded.
 	ObjKeyPrefix string // 用半角括号括住, 详见 COS.makeObjKey
 
+	// 用于从云端恢复数据到本地, 由用户指定 Object Name.
+	ObjectName string
+
 	ErrMsg string
 }
 

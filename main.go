@@ -40,8 +40,9 @@ func main() {
 	http.HandleFunc("/delete-forever/", noCache(checkState(deleteForever)))
 	http.HandleFunc("/delete-tarballs/", noCache(deleteTarballs))
 	http.HandleFunc("/edit/", noCache(checkState(editPage)))
-	http.HandleFunc("/setup-ibm", noCache(checkState(setupIBM)))
-	http.HandleFunc("/setup-cloud", noCache(checkState(setupIBM)))
+	http.HandleFunc("/setup-ibm", noCache(setupIBM))
+	http.HandleFunc("/recover-from-ibm/", noCache(recoverFromIBM))
+	http.HandleFunc("/setup-cloud", noCache(setupIBM))
 	http.HandleFunc("/backup-to-cloud/", noCache(checkState(backupToCloud)))
 	http.HandleFunc("/backup-to-cloud-loading/", noCache(backupToCloudLoading))
 	http.HandleFunc("/api/edit", checkLogin(editHandler))
@@ -155,13 +156,17 @@ func setupIBM(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "setup-ibm", nil))
 		return
 	}
-	settings, err := getSettings(w, r)
+	settings, err := getSettings(r, false)
 	if err != nil {
+		checkErrForSetupIBM(w, err.Error(), &settings)
 		return
 	}
-	cos = newCOSFromSettings(&settings)
-
+	if isLoggedOut() {
+		checkErrForSetupIBM(w, "未登入(或已登出)", &settings)
+		return
+	}
 	// 执行一次备份 (其中包括备份后下载回来检查数据是否一致)
+	cos = newCOSFromSettings(&settings)
 	if err := doBackup(); err != nil {
 		checkErrForSetupIBM(w, err.Error(), &settings)
 		return
@@ -173,13 +178,27 @@ func setupIBM(w httpRW, r httpReq) {
 	}
 	// 显示成功信息
 	cloudInfo := getCloudInfo()
-	cloudInfo.Info = "云备份设置成功! 并且已备份一次, 云端备份信息如下所示:"
+	cloudInfo.Info = "云备份设置成功! 并且已备份一次."
 	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", cloudInfo))
 }
 
-// getSettings 如果成功则返回 settings, 若有错误则直接输出到前端网页中,
-// 注意如果返回 err != nil, 外层必须立即 return.
-func getSettings(w httpRW, r httpReq) (settings Settings, err error) {
+func recoverFromIBM(w httpRW, r httpReq) {
+	if r.Method != http.MethodPost {
+		checkErr(w, templates.ExecuteTemplate(w, "recover-from-ibm", nil))
+		return
+	}
+	settings, err := getSettings(r, true)
+	if err != nil {
+		checkErrForRecoverFromIBM(w, err.Error(), &settings)
+		return
+	}
+	if !db.FileNotExist() {
+		checkErrForRecoverFromIBM(w, "在已存在数据库文件的情况下, 不可从云端恢复数据到本地", &settings)
+		return
+	}
+}
+
+func getSettings(r httpReq, needObjName bool) (settings Settings, err error) {
 	var prefix string
 	prefix, err = mimaDB.NewID()
 	settings = Settings{
@@ -189,9 +208,14 @@ func getSettings(w httpRW, r httpReq) (settings Settings, err error) {
 		BucketLocation:    strings.TrimSpace(r.FormValue("bucketLocation")),
 		BucketName:        strings.TrimSpace(r.FormValue("bucketName")),
 		ObjKeyPrefix:      prefix,
+		ObjectName:        strings.TrimSpace(r.FormValue("objectName")),
 	}
-	if err != nil {
-		checkErrForSetupIBM(w, err.Error(), &settings)
+	if !needObjName {
+		settings.ObjectName = "不需要 Object Name, 因此乱填一些数据进来确保其不是空字符串"
+	}
+	if settings.ApiKey == "" || settings.ServiceInstanceID == "" || settings.ServiceEndpoint == "" ||
+		settings.BucketLocation == "" || settings.BucketName == "" || settings.ObjectName == "" {
+		err = errors.New("有漏填项目: 每个框都必须填写正确内容")
 	}
 	return
 }
@@ -199,6 +223,11 @@ func getSettings(w httpRW, r httpReq) (settings Settings, err error) {
 func checkErrForSetupIBM(w httpRW, errMsg string, settings *Settings) {
 	settings.ErrMsg = errMsg
 	checkErr(w, templates.ExecuteTemplate(w, "setup-ibm", settings))
+}
+
+func checkErrForRecoverFromIBM(w httpRW, errMsg string, settings *Settings) {
+	settings.ErrMsg = errMsg
+	checkErr(w, templates.ExecuteTemplate(w, "recover-from-ibm", settings))
 }
 
 func checkErrForBackupToCloud(w httpRW, errMsg string) {

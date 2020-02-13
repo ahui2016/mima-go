@@ -9,18 +9,21 @@
     {{end}}
     {{if .Err}}
         <p style="font-weight: bold; color: red">Error: {{.Err}}</p>
+        <p><a href="/backup-to-cloud-loading/">重试</a></p>
     {{else}}
+        <p>云端备份信息如下所示,<br/>
+           其中, 请记住 Object Name 的内容, 从云端恢复数据到本地时需要填写 Object Name.</p>
         <ul>
             <li>Cloud Service: <u>{{.CloudServiceName}}</u></li>
             <li>Bucket Name: <u>{{.BucketName}}</u></li>
             <li>Object Name: <u>{{.ObjectName}}</u></li>
             <li>Last Backup: <u>{{.LastModified}}</u></li>
         </ul>
+        <p>Click the button below to back up again:</p>
+        <form action="/backup-to-cloud/" method="post">
+            <input type="submit" value="Backup" onclick="this.value='loading...';this.setAttribute('disabled','')" />
+        </form>
     {{end}}
-
-    <form action="/backup-to-cloud/" method="post">
-        <input type="submit" value="Backup" onclick="this.value='loading...';this.setAttribute('disabled','')" />
-    </form>
 
     {{template "bottom"}}
 {{end}}
