@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	mimaDB "github.com/ahui2016/mima-go/db"
-	"github.com/ahui2016/mima-go/ibm"
 	"github.com/atotto/clipboard"
 	"log"
 	"net/http"
@@ -42,6 +41,7 @@ func main() {
 	http.HandleFunc("/delete-tarballs/", noCache(deleteTarballs))
 	http.HandleFunc("/edit/", noCache(checkState(editPage)))
 	http.HandleFunc("/setup-ibm", noCache(checkState(setupIBM)))
+	http.HandleFunc("/setup-cloud", noCache(checkState(setupIBM)))
 	http.HandleFunc("/backup-to-cloud/", noCache(checkState(backupToCloud)))
 	http.HandleFunc("/api/edit", checkLogin(editHandler))
 	http.HandleFunc("/api/new-password", newPassword)
@@ -54,7 +54,7 @@ func main() {
 	addr := getAddr()
 	term := getTerm()
 	db.ValidTerm = time.Minute * time.Duration(term)
-	fmt.Println(addr, "有效期:", term, "minutes")
+	fmt.Println(addr, "time limit:", term, "minutes")
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
 
@@ -154,8 +154,34 @@ func setupIBM(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "setup-ibm", nil))
 		return
 	}
-	prefix, err := mimaDB.NewID()
-	settings := Settings{
+	settings, err := getSettings(w, r)
+	if err != nil {
+		return
+	}
+	cos = newCOSFromSettings(&settings)
+
+	// 执行一次备份 (其中包括备份后下载回来检查数据是否一致)
+	if err := doBackup(); err != nil {
+		checkErrForSetupIBM(w, err.Error(), &settings)
+		return
+	}
+	// 更新设置 (持久化)
+	if err := updateSettings(settings); err != nil {
+		checkErrForSetupIBM(w, err.Error(), &settings)
+		return
+	}
+	// 显示成功信息
+	cloudInfo := getCloudInfo()
+	cloudInfo.Info = "云备份设置成功! 并且已备份一次, 云端备份信息如下所示:"
+	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", cloudInfo))
+}
+
+// getSettings 如果成功则返回 settings, 若有错误则直接输出到前端网页中,
+// 注意如果返回 err != nil, 外层必须立即 return.
+func getSettings(w httpRW, r httpReq) (settings Settings, err error) {
+	var prefix string
+	prefix, err = mimaDB.NewID()
+	settings = Settings{
 		ApiKey:            strings.TrimSpace(r.FormValue("apiKey")),
 		ServiceInstanceID: strings.TrimSpace(r.FormValue("serviceInstanceID")),
 		ServiceEndpoint:   strings.TrimSpace(r.FormValue("serviceEndpoint")),
@@ -165,59 +191,8 @@ func setupIBM(w httpRW, r httpReq) {
 	}
 	if err != nil {
 		checkErrForSetupIBM(w, err.Error(), &settings)
-		return
 	}
-	cos = ibm.NewCOS(settings.ApiKey, settings.ServiceInstanceID, settings.ServiceEndpoint,
-		settings.BucketLocation, settings.BucketName, settings.ObjKeyPrefix)
-
-	buf, err := db.ReadMimaTable()
-	if err != nil {
-		checkErrForSetupIBM(w, err.Error(), &settings)
-		return
-	}
-	// 尝试备份到云端
-	if _, err := cos.Upload(DBName, &buf); err != nil {
-		checkErrForSetupIBM(w, err.Error(), &settings)
-		return
-	}
-	// 尝试从云端获取数据
-	data, err := cos.GetObjectBody(DBName)
-	if err != nil {
-		checkErrForSetupIBM(w, err.Error(), &settings)
-		return
-	}
-	//noinspection GoUnhandledErrorResult
-	defer data.Close()
-	// 检查从云端获取回来的数据与内存数据库是否一致 (只检查 UpdatedAt)
-	ok, err := db.EqualByUpdatedAt(data)
-	if err != nil {
-		checkErrForSetupIBM(w, err.Error(), &settings)
-		return
-	}
-	if !ok {
-		checkErrForSetupIBM(w, "把内存数据库上传到云端, 再下载回来后, 与内存数据库不一致.", &settings)
-		return
-	}
-	// 更新设置 (持久化)
-	if err := updateSettings(settings); err != nil {
-		checkErrForSetupIBM(w, err.Error(), &settings)
-		return
-	}
-	// 显示成功信息
-	lastModified, err := cos.GetLastModified(DBName)
-	if err != nil {
-		info := CloudInfo{Err: err.Error()}
-		checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &info))
-		return
-	}
-	cloudInfo := CloudInfo{
-		CloudServiceName: "IBM Cloud Object Storage",
-		BucketName:       settings.BucketName,
-		ObjectName:       cos.MakeObjKey(DBName),
-		LastModified:     lastModified,
-		Info:             "云备份设置成功! 并且已备份一次, 云端备份信息如下所示:",
-	}
-	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &cloudInfo))
+	return
 }
 
 func checkErrForSetupIBM(w httpRW, errMsg string, settings *Settings) {
@@ -225,31 +200,70 @@ func checkErrForSetupIBM(w httpRW, errMsg string, settings *Settings) {
 	checkErr(w, templates.ExecuteTemplate(w, "setup-ibm", settings))
 }
 
+func checkErrForBackupToCloud(w httpRW, errMsg string) {
+	err := CloudInfo{Err: errMsg}
+	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &err))
+}
+
 func backupToCloud(w httpRW, r httpReq) {
 	if !db.HasSettings() {
-		http.Redirect(w, r, "/setup-ibm", http.StatusFound)
+		http.Redirect(w, r, "/setup-cloud", http.StatusFound)
 		return
 	}
 	if cos == nil {
 		if err := makeCOS(db.GetSettings()); err != nil {
-			err := CloudInfo{Err: err.Error()}
-			checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &err))
+			checkErrForBackupToCloud(w, err.Error())
 			return
 		}
 	}
-	lastModified, err := cos.GetLastModified(DBName)
-	if err != nil {
-		info := CloudInfo{Err: err.Error()}
-		checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &info))
+	if r.Method != http.MethodPost {
+		cloudInfo := getCloudInfo()
+		checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", cloudInfo))
 		return
 	}
-	cloudInfo := CloudInfo{
+	// 执行备份
+	if err := doBackup(); err != nil {
+		checkErrForBackupToCloud(w, err.Error())
+		return
+	}
+	// 显示成功信息
+	cloudInfo := getCloudInfo()
+	cloudInfo.Info = "云备份成功! 最新的云端备份信息如下所示:"
+	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", cloudInfo))
+}
+
+func getCloudInfo() *CloudInfo {
+	lastModified, err := cos.GetLastModified(DBName)
+	if err != nil {
+		return &CloudInfo{Err: err.Error()}
+	}
+	return &CloudInfo{
 		CloudServiceName: "IBM Cloud Object Storage",
 		BucketName:       cos.BucketName,
 		ObjectName:       cos.MakeObjKey(DBName),
 		LastModified:     lastModified,
 	}
-	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", &cloudInfo))
+}
+
+func doBackup() error {
+	// 尝试备份到云端
+	buf, err := db.ReadMimaTable()
+	if err != nil {
+		return err
+	}
+	if _, err := cos.Upload(DBName, &buf); err != nil {
+		return err
+	}
+	// 尝试从云端获取数据
+	data, err := cos.GetObjectBody(DBName)
+	if err != nil {
+		return err
+	}
+	//noinspection GoUnhandledErrorResult
+	defer data.Close()
+	// 检查从云端获取回来的数据与内存数据库是否一致 (只检查 UpdatedAt)
+	// TODO: 更详细地检查
+	return db.EqualByUpdatedAt(data)
 }
 
 func homeHandler(w httpRW, r httpReq) {

@@ -2,7 +2,10 @@
     {{template "top"}}
     <p class="top-banner"><a href="/home">mima-go</a> .. <strong>Backup to cloud</strong></p>
 
-    <hr style="margin-bottom: 2em;" />
+    <hr />
+    <p style="text-align:right">
+        <a href="/setup-cloud">Setup Cloud</a>
+    </p>
 
     {{if .Info}}
         <p style="font-weight: bold; color: blue">{{.Info}}</p>
@@ -17,6 +20,10 @@
             <li>Last Modified: {{.LastModified}}</li>
         </ul>
     {{end}}
+
+    <form action="/backup-to-cloud" method="post">
+        <input type="submit" value="Backup" />
+    </form>
 
     {{template "bottom"}}
 {{end}}

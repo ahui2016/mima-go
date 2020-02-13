@@ -27,19 +27,15 @@ const (
 )
 
 var (
-	FileNotFound      error
-	errNeedTitle      error
+	FileNotFound = errors.New("找不到数据库文件")
+	errNeedTitle = errors.New("'Title' 长度不可为零, 请填写 Title")
+	errCloudDataNotEqual = errors.New("NotEqual: (云端)数据与本地数据不一致")
 )
 
 type (
 	Nonce     = [NonceSize]byte
 	SecretKey = [KeySize]byte
 )
-
-func init() {
-	FileNotFound = errors.New("找不到数据库文件")
-	errNeedTitle = errors.New("'Title' 长度不可为零, 请填写 Title")
-}
 
 func newRandomKey() SecretKey {
 	s := randomString()

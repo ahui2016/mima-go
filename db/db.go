@@ -175,21 +175,21 @@ func (db *DB) ReadMimaTable() (buf bytes.Buffer, err error) {
 }
 
 // EqualByUpdatedAt 用于对比从云端下载回来的数据是否与内存数据库一致.
-func (db *DB) EqualByUpdatedAt(data io.ReadCloser) (bool, error) {
+func (db *DB) EqualByUpdatedAt(data io.ReadCloser) error {
 	scanner := bufio.NewScanner(data)
 	var i int
 	for scanner.Scan() {
 		box64 := scanner.Text()
 		mima, err := Decrypt(box64, db.Key(i))
 		if err != nil {
-			return false, err
+			return err
 		}
 		if !mima.EqualByUpdatedAt(db.GetByIndex(i)) {
-			return false, nil
+			return errCloudDataNotEqual
 		}
 		i++
 	}
-	return true, scanner.Err()
+	return nil
 }
 
 // Key 根据 i 选择不同的 key. 因为第 0 个 mima 是特殊的, 采用不同的 key.
