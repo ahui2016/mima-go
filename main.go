@@ -172,7 +172,7 @@ func setupIBM(w httpRW, r httpReq) {
 		return
 	}
 	// 更新设置 (持久化)
-	if err := updateSettings(settings); err != nil {
+	if err := updateSettings(&settings); err != nil {
 		checkErrForSetupIBM(w, err.Error(), &settings)
 		return
 	}
@@ -196,6 +196,36 @@ func recoverFromIBM(w httpRW, r httpReq) {
 		checkErrForRecoverFromIBM(w, "在已存在数据库文件的情况下, 不可从云端恢复数据到本地", &settings)
 		return
 	}
+	cos = newCOSFromSettings(&settings)
+	data, err := cos.GetObjectBody(settings.ObjectName)
+	if err != nil {
+		checkErrForRecoverFromIBM(w, err.Error(), &settings)
+		return
+	}
+	//noinspection GoUnhandledErrorResult
+	defer data.Close()
+
+	// 生成本地数据库文件, 其中 settings 已更新 (采用新的 prefix).
+	settings64, err := settings.Encode()
+	if err != nil {
+		checkErrForRecoverFromIBM(w, err.Error(), &settings)
+		return
+	}
+	if err := db.WriteDBFileFromReader(data, r.FormValue("password"), settings64); err != nil {
+		checkErrForRecoverFromIBM(w, err.Error(), &settings)
+		return
+	}
+
+	// 由于 prefix 已发生变化, 必须上传一次让云端也 "知道" 这个新的 prefix.
+	// "知道" 是指执行 getCloudInfo() 时能顺利获取云端信息.
+	if err := doBackup(); err != nil {
+		checkErrForRecoverFromIBM(w, err.Error(), &settings)
+		return
+	}
+
+	cloudInfo := getCloudInfo()
+	cloudInfo.Info = "从云端下载数据库成功. 注意已自动生成新的 Object Name"
+	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", cloudInfo))
 }
 
 func getSettings(r httpReq, needObjName bool) (settings Settings, err error) {
@@ -267,7 +297,7 @@ func backupToCloud(w httpRW, r httpReq) {
 }
 
 func getCloudInfo() *CloudInfo {
-	lastModified, err := cos.GetLastModified(DBName)
+	lastModified, err := cos.GetLastModified(cos.MakeObjKey(DBName))
 	if err != nil {
 		return &CloudInfo{Err: err.Error()}
 	}
@@ -289,7 +319,7 @@ func doBackup() error {
 		return err
 	}
 	// 尝试从云端获取数据
-	data, err := cos.GetObjectBody(DBName)
+	data, err := cos.GetObjectBody(cos.MakeObjKey(DBName))
 	if err != nil {
 		return err
 	}

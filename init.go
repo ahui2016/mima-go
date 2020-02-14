@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -94,11 +92,10 @@ func newCOSFromSettings(settings *Settings) *ibm.COS {
 		settings.BucketLocation, settings.BucketName, settings.ObjKeyPrefix)
 }
 
-func updateSettings(settings Settings) error {
-	settingsJson, err := json.Marshal(settings)
+func updateSettings(settings *Settings) error {
+	settings64, err := settings.Encode()
 	if err != nil {
 		return err
 	}
-	settings64 := base64.StdEncoding.EncodeToString(settingsJson)
 	return db.UpdateSettings(settings64)
 }

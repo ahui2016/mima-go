@@ -44,6 +44,16 @@ type Settings struct {
 	ErrMsg string
 }
 
+// Encode to JSON, and encode to base64.
+func (settings *Settings) Encode() (string, error) {
+	settingsJson, err := json.Marshal(settings)
+	if err != nil {
+		return "", err
+	}
+	settings64 := base64.StdEncoding.EncodeToString(settingsJson)
+	return settings64, nil
+}
+
 // CloudInfo 用来表示云端文件的信息.
 type CloudInfo struct {
 	CloudServiceName string

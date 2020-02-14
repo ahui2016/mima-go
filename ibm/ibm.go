@@ -113,7 +113,7 @@ func (cos *COS) Upload(objName string, objBody io.Reader) (*s3manager.UploadOutp
 func (cos *COS) getObject(name string) (*s3.GetObjectOutput, error) {
 	input := s3.GetObjectInput{
 		Bucket: aws.String(cos.BucketName),
-		Key:    aws.String(cos.MakeObjKey(name)),
+		Key:    aws.String(name),
 	}
 	return cos.client.GetObject(&input)
 }
@@ -138,7 +138,7 @@ func (cos *COS) listObjects() (*s3.ListObjectsV2Output, error) {
 	return cos.client.ListObjectsV2(input)
 }
 
-func (cos *COS) GetLastModified(objName string) (lastModified *time.Time, err error) {
+func (cos *COS) GetLastModified(objKey string) (lastModified *time.Time, err error) {
 	if cos.conf == nil {
 		cos.makeConfig()
 	}
@@ -147,7 +147,6 @@ func (cos *COS) GetLastModified(objName string) (lastModified *time.Time, err er
 		return nil, err
 	}
 
-	objKey := cos.MakeObjKey(objName)
 	for _, obj := range output.Contents {
 		if *obj.Key == objKey {
 			return obj.LastModified, nil

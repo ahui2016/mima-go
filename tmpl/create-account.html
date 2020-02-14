@@ -2,11 +2,13 @@
 {{template "top"}}
 <p class="top-banner">mima-go .. <strong>Create New Account</strong></p>
 
-<hr style="margin-bottom: 2em;" />
+<hr />
+<p style="text-align:right">
+    <a href="/recover-from-ibm/">Recover from cloud</a>
+</p>
 
 <p>The <strong>mima.db</strong> file does not exist.</p>
 <p>Input a new password to create a new account.</p>
-<p>Or <a href="/recover-from-ibm/">Recover from cloud</a></p>
 
 {{if .Err}}
     <p style="font-weight: bold; color: red">

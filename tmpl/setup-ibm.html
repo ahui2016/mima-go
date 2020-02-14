@@ -23,7 +23,8 @@
         <p style="font-weight: bold; color: red">Error: {{.ErrMsg}}</p>
     {{end}}
 
-    <form action="/setup-ibm" method="POST" autocomplete="off">
+    <form action="/setup-ibm" method="POST" autocomplete="off"
+          onsubmit="document.getElementById('submit').value = 'loading...';document.getElementById('submit').setAttribute('disabled','');">
         <label for="apiKey"><span style="font-weight: bold">apiKey</span>:</label>
         <input type="text" name="apiKey" id="apiKey" class="Fields" value="{{.ApiKey}}" autofocus/>
         <label for="serviceInstanceID"><span style="font-weight: bold">resource_instance_id</span> (serviceInstanceID):</label>
@@ -35,7 +36,7 @@
         <label for="bucketName">Bucket <span style="font-weight: bold">Name</span>:</label>
         <input type="text" name="bucketName" id="bucketName" class="Fields" value="{{.BucketName}}"/>
         <p>
-            <input type="submit" value="Submit" onclick="this.value='loading...';this.setAttribute('disabled','');"/>
+            <input type="submit" value="Submit" id="submit" />
         </p>
     </form>
 

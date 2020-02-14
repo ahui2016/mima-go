@@ -20,8 +20,9 @@
             <li>Last Backup: <u>{{.LastModified}}</u></li>
         </ul>
         <p>Click the button below to back up again:</p>
-        <form action="/backup-to-cloud/" method="post">
-            <input type="submit" value="Backup" onclick="this.value='loading...';this.setAttribute('disabled','')" />
+        <form action="/backup-to-cloud/" method="post"
+              onsubmit="document.getElementById('submit').value = 'loading...';document.getElementById('submit').setAttribute('disabled','');">
+            <input type="submit" value="Backup" id="submit" />
         </form>
     {{end}}
 

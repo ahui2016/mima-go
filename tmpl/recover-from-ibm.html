@@ -7,13 +7,15 @@
     <ul>
         <li>在创建云端备份时, 曾填写过以下信息, 现在从云端恢复数据到本地, 需要填写与当时一样的信息以验证身份.</li>
         <li>参考: 创建云端备份的页面 <a href="/setup-cloud" target="_blank">Setup Cloud</a></li>
+        <li>还需要需要正确的密码.</li>
     </ul>
 
     {{if .ErrMsg}}
         <p style="font-weight: bold; color: red">Error: {{.ErrMsg}}</p>
     {{end}}
 
-    <form action="/recover-from-ibm/" method="POST" autocomplete="off">
+    <form action="/recover-from-ibm/" method="POST" autocomplete="on"
+          onsubmit="document.getElementById('submit').value = 'loading...';document.getElementById('submit').setAttribute('disabled','');">
         <label for="apiKey"><span style="font-weight: bold">apiKey</span>:</label>
         <input type="text" name="apiKey" id="apiKey" class="Fields" value="{{.ApiKey}}" autofocus/>
         <label for="serviceInstanceID"><span style="font-weight: bold">resource_instance_id</span> (serviceInstanceID):</label>
@@ -25,9 +27,11 @@
         <label for="bucketName">Bucket <span style="font-weight: bold">Name</span>:</label>
         <input type="text" name="bucketName" id="bucketName" class="Fields" value="{{.BucketName}}"/>
         <label for="objectName">Object Name (Object Key):</label>
-        <input type="text" name="objectName" id="objectName" class="Fields" value="{{.BucketName}}"/>
+        <input type="text" name="objectName" id="objectName" class="Fields" value="{{.ObjectName}}"/>
+        <label for="password">Password:</label>
+        <input type="password" name="password" id="password" class="Fields" />
         <p>
-            <input type="submit" value="Submit" onclick="this.value='loading...';this.setAttribute('disabled','');"/>
+            <input type="submit" value="Submit" id="submit"/>
         </p>
     </form>
 

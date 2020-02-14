@@ -192,6 +192,43 @@ func (db *DB) EqualByUpdatedAt(data io.ReadCloser) error {
 	return nil
 }
 
+// WriteDBFileFromReader 主要用于把从云端下载回来的数据写到本地文件里.
+// 此时, 必须更新 settings 以确保下次上传到云端时不会覆盖原文件.
+// 在本函数内不关闭 data, 应在外层关闭.
+func (db *DB) WriteDBFileFromReader(data io.ReadCloser, password string, settings string) error {
+	var dbFile *os.File
+	var dbWriter *bufio.Writer
+	scanner := bufio.NewScanner(data)
+	key := sha256.Sum256([]byte(password))
+
+	i := 0
+	for scanner.Scan() {
+		box64 := scanner.Text()
+		if i == 0 {
+			if mima, err := Decrypt(box64, &key); err != nil {
+				return errors.New("Password Wrong: 密码错误 ")
+			} else {
+				mima.Notes = settings
+				if box64, err = mima.Seal(&key); err != nil {
+					return err
+				}
+				i++
+				dbFile, err = os.Create(db.FullPath)
+				if err != nil {
+					return err
+				}
+				//noinspection GoUnhandledErrorResult
+				defer dbFile.Close()
+				dbWriter = bufio.NewWriter(dbFile)
+			}
+		}
+		if err := bufWriteln(dbWriter, box64); err != nil {
+			return err
+		}
+	}
+	return dbWriter.Flush()
+}
+
 // Key 根据 i 选择不同的 key. 因为第 0 个 mima 是特殊的, 采用不同的 key.
 func (db *DB) Key(i int) *SecretKey {
 	if i == 0 {
