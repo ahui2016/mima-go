@@ -36,7 +36,7 @@
   做简单的 GUI 程序非常轻松, 因此我做了一个简单的启动器.
 - 到 https://autohotkey.com 下载安装 AutoHotkey 后, 双击本程序源码中的 mima-gui.ahk 即可启动.
 
-![mima-gui](screenshot.png)
+![mima-gui](screenshot.jpg)
 
 ## 特色功能: Alias
 
