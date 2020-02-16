@@ -4,33 +4,66 @@ SendMode Input  ; Recommended for new scripts due to its superior speed and reli
 SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 
 #SingleInstance Ignore
-;#NoTrayIcon
-Gui, New, -SysMenu +Resize ;+MinSize640x480 +DPIScale
-Gui, Add, Button, x250, Exit
-Gui, Add, Text, xm, port: (default 10001)
-Gui, Add, Edit, vPort, 10001
+#NoTrayIcon
+Run, cmd.exe,, Hide, mimaGoPID
+Gui, New, +DPIScale +Resize +MinSize640x480 ;-SysMenu 
+Gui, Font, s16
+Gui, Add, Text,, mima-go 启动器
 Gui, Add, Text
-Gui, Add, Button, gButtonMimaGo, mima-go
-Gui, Add, Button, gButtonShowMimaGo, show window
-Gui, Add, Button, gButtonHideMimaGo, hide window
-Gui, Show, W300 H200
+Gui, Add, Text, xm section, port: 
+Gui, Add, Edit, ys vPort, 10001
+Gui, Add, Text, ys, (default 10001)
+Gui, Add, Text, xm, 点击 Start 即可启动程序, 控制台窗口会自动隐藏.
+Gui, Add, Button, xm section vStartButton, Start
+Gui, Add, Button, ys vRestartButton, Restart
+GuiControl, Hide, RestartButton
+Gui, Add, Link, xm vLinkToLocal
+Gui, Add, Text, xm
+Gui, Add, Text,, 点击 show console 可查看控制台信息 (比如出错信息).
+Gui, Add, Button, xm section, show console
+Gui, Add, Button, ys, hide console
+Gui, Add, Text, xm section
+Gui, Add, Button, x550, Exit
+Gui, Show, W640 H480
 Return
 
-ButtonMimaGo:
+ButtonStart:
 Gui, Submit, NoHide
 if Port not between 80 and 65536
     Port = 10001
+WinShow, ahk_pid %mimaGoPID%
+WinWaitActive, ahk_pid %mimaGoPID%
+; Run, mima-go.exe -port %Port%,, , mimaGoPID
+Send mima-go.exe -port %Port%{enter}
+Sleep, 500
+WinHide, ahk_pid %mimaGoPID%
+GuiControl, Show, RestartButton
+GuiControl, Disable, StartButton
+GuiControl, Text, LinkToLocal, 点击链接进入程序界面: <a href="http://localhost:%Port%">http://localhost:%Port%</a>
+GuiControl, MoveDraw, LinkToLocal, w640
+Return
+
+ButtonRestart:
+Gui, Submit, NoHide
+if Port not between 80 and 65536
+    Port = 10001
+DetectHiddenWindows, on
+WinKill, ahk_pid %mimaGoPID%
+WinWaitClose, ahk_pid %mimaGoPID%
 Run, cmd.exe,,, mimaGoPID
 WinWaitActive, ahk_pid %mimaGoPID%
 Send mima-go.exe -port %Port%{enter}
-; Run, mima-go.exe -port %Port%,, , mimaGoPID
+Sleep, 500
+WinHide, ahk_pid %mimaGoPID%
+DetectHiddenWindows, off
+GuiControl, Text, LinkToLocal, 点击链接进入程序界面: <a href="http://localhost:%Port%">http://localhost:%Port%</a>
 Return
 
-ButtonShowMimaGo:
+ButtonShowConsole:
 WinShow, ahk_pid %mimaGoPID%
 Return
 
-ButtonHideMimaGo:
+ButtonHideConsole:
 WinHide, ahk_pid %mimaGoPID%
 Return
 
