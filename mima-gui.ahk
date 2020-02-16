@@ -19,9 +19,9 @@ Gui, Add, Button, ys vRestartButton, Restart
 GuiControl, Hide, RestartButton
 Gui, Add, Link, xm vLinkToLocal
 Gui, Add, Text, xm
-Gui, Add, Text,, 点击 show console 可查看控制台信息 (比如出错信息).
-Gui, Add, Button, xm section, show console
-Gui, Add, Button, ys, hide console
+Gui, Add, Text,, 点击 Show Console 可查看控制台信息 (比如出错信息).
+Gui, Add, Button, xm section, Show Console
+Gui, Add, Button, ys, Hide Console
 Gui, Add, Text, xm section
 Gui, Add, Button, x550, Exit
 Gui, Show, W640 H480
