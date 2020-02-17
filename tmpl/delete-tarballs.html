@@ -3,7 +3,10 @@
 
     <p class="top-banner"><a href="/home">mima-go</a> .. <strong>删除本地备份文件</strong></p>
 
-    <hr style="margin-bottom: 2em;" />
+    <hr />
+    <p style="text-align:right">
+        <a href="/recyclebin">Recycle Bin</a>
+    </p>
 
     {{if .Err}}
         <p style="font-weight: bold; color: red">
@@ -21,8 +24,6 @@
         <p>(当备份文件超过 10 个时, 本页面会显示删除按钮, 点击按钮即可执行自动删除.)</p>
         <p>(自动删除的意思是: 删除一部分旧备份文件, 保留 10 个最新的备份文件)</p>
     {{end}}
-
-    <p><a href="/home">返回首页</a></p>
 
     {{template "bottom"}}
 {{end}}
