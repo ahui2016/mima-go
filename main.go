@@ -150,6 +150,7 @@ func loginHandler(w httpRW, r httpReq) {
 	}
 	sessionManager.Add(w, mimaDB.NewID())
 
+	log.Println("Logged in: 已登入")
 	http.Redirect(w, r, "/home/", http.StatusFound)
 }
 
@@ -595,6 +596,7 @@ func checkErr(w httpRW, err error) {
 func logout(w httpRW) {
 	db.Reset()
 	sessionManager.DeleteSID(w)
+	log.Println("Logged out: 已登出")
 }
 
 func isLoggedOut(r httpReq) bool {
