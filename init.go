@@ -26,8 +26,9 @@ var (
 	tmplDirPath string
 	templates   *template.Template
 
-	db  *mimaDB.DB
-	cos *ibm.COS
+	db             *mimaDB.DB
+	cos            *ibm.COS
+	sessionManager *SessionManager
 
 	errMimaDeleted = errors.New("此记录已被删除")
 )

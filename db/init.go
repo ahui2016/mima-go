@@ -62,16 +62,15 @@ func newNonce() (nonce Nonce, err error) {
 
 // NewID 返回一个由时间戳和随机数组成的 id, 经测试瞬间生成一万个 id 不会重复.
 // 由于时间戳的精度为秒, 因此如果两次生成 id 之间超过一秒, 则绝对不会重复.
-func NewID() (id string, err error) {
+func NewID() string {
 	var max int64 = 100_000_000
 	n, err := rand.Int(rand.Reader, big.NewInt(max))
 	if err != nil {
-		return
+		panic(err)
 	}
 	timestamp := time.Now().Unix()
 	idInt64 := timestamp*max + n.Int64()
-	id = strconv.FormatInt(idInt64, 36)
-	return
+	return strconv.FormatInt(idInt64, 36)
 }
 
 func bytesToKey(b []byte) (key SecretKey) {

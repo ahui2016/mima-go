@@ -3,6 +3,9 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
+	"sync"
+	"time"
 )
 
 type SearchResult struct {
@@ -10,10 +13,6 @@ type SearchResult struct {
 	Forms      []*MimaForm
 	Info       error
 	Err        error
-}
-
-type AjaxResponse struct {
-	Message string
 }
 
 // Feedback 用来表示一个普通的表单.
@@ -72,4 +71,63 @@ func NewSettingsFromJSON64(settings64 string) (*Settings, error) {
 	settings := new(Settings)
 	err = json.Unmarshal(settingsJSON, settings)
 	return settings, err
+}
+
+type SessionManager struct {
+	sync.Mutex
+	store     map[string]bool
+	name      string
+	validTerm time.Duration // 有效时长
+}
+
+// NewSessionManager 简单地返回一个的 session manager, 其中 name 固定为 "SID".
+func NewSessionManager(validTerm time.Duration) *SessionManager {
+	return &SessionManager{
+		store:     make(map[string]bool),
+		name:      "SID",
+		validTerm: validTerm,
+	}
+}
+
+func (manager *SessionManager) NewSession(sid string) http.Cookie {
+	return http.Cookie{
+		Name:     manager.name,
+		Value:    sid,
+		Expires:  time.Now().Add(manager.validTerm),
+		HttpOnly: true,
+	}
+}
+
+// Add 新增一个 sid 到 store 里, 并且写入到 w 中.
+// sid 应该是一个随机数, 因此本函数内不检查冲突.
+func (manager *SessionManager) Add(w httpRW, sid string) {
+	manager.Lock()
+	defer manager.Unlock()
+	session := manager.NewSession(sid)
+	http.SetCookie(w, &session)
+	manager.store[sid] = true
+}
+
+// Check 检查一个 request 中是否包含有效的 sid.
+// 若包含有效的 sid 则返回 true.
+func (manager *SessionManager) Check(r httpReq) bool {
+	manager.Lock()
+	defer manager.Unlock()
+	cookie, err := r.Cookie(manager.name)
+	if err != nil || cookie.Value == "" || !manager.store[cookie.Value] {
+		return false
+	}
+	return true
+}
+
+// DeleteSID 删除客户端的 SID.
+func (manager *SessionManager) DeleteSID(w httpRW) {
+	manager.Lock()
+	defer manager.Unlock()
+	session := http.Cookie{
+		Name:     manager.name,
+		MaxAge:   -1,
+		HttpOnly: true,
+	}
+	http.SetCookie(w, &session)
 }

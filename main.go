@@ -57,11 +57,12 @@ func main() {
 	term := getTerm()
 	db.ValidTerm = time.Minute * time.Duration(term)
 	fmt.Println(addr, "time limit:", term, "minutes")
+	sessionManager = NewSessionManager(time.Hour * 12) // 默认 session 有效期为 12 小时
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
 
 func createAccount(w httpRW, r httpReq) {
-	if !isLoggedOut() || !db.FileNotExist() {
+	if !isLoggedOut(r) || !db.FileNotExist() {
 		err := &Feedback{Err: errors.New("已存在账号, 不可重复创建")}
 		checkErr(w, templates.ExecuteTemplate(w, "create-account", err))
 		return
@@ -81,13 +82,13 @@ func createAccount(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "create-account", &Feedback{Err: err}))
 		return
 	}
-	logout()
+	logout(w)
 	info := &Feedback{Info: errors.New("成功创建新账号, 请登入")}
 	checkErr(w, templates.ExecuteTemplate(w, "login", info))
 }
 
 func changePassword(w httpRW, r httpReq) {
-	if isLoggedOut() || db.FileNotExist() {
+	if isLoggedOut(r) || db.FileNotExist() {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
@@ -107,7 +108,7 @@ func changePassword(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "change-password", &Feedback{Err: err}))
 		return
 	}
-	logout()
+	logout(w)
 	info := &Feedback{Info: errors.New("密码修改成功, 请使用新密码登入")}
 	checkErr(w, templates.ExecuteTemplate(w, "login", info))
 }
@@ -120,7 +121,7 @@ func loginHandler(w httpRW, r httpReq) {
 		checkErr(w, templates.ExecuteTemplate(w, "create-account", nil))
 		return
 	}
-	if !isLoggedOut() {
+	if !isLoggedOut(r) {
 		err := &Feedback{Err: errors.New("已登入, 不可重复登入")}
 		checkErr(w, templates.ExecuteTemplate(w, "login", err))
 		return
@@ -131,22 +132,29 @@ func loginHandler(w httpRW, r httpReq) {
 	}
 	password := r.FormValue("password")
 	key := sha256.Sum256([]byte(password))
-	db.Reset()
-	if _, err := db.Rebuild(&key); err != nil {
-		logout()
+	if db.IsNotInit() {
+		db.Reset()
+		if _, err := db.Rebuild(&key); err != nil {
+			logout(w)
+			checkErr(w, templates.ExecuteTemplate(w, "login", &Feedback{Err: err}))
+			return
+		}
+		// 必须更新时间, 这是容易忽略出错的地方.
+		// 如果不更新时间, 会出现 "未登入, 已超时" 的错误.
+		db.StartedAt = time.Now()
+	}
+	if key != db.UserKey() {
+		err := errors.New("密码错误")
 		checkErr(w, templates.ExecuteTemplate(w, "login", &Feedback{Err: err}))
 		return
 	}
-
-	// 必须更新时间, 这是容易忽略出错的地方.
-	// 如果不更新时间, 会出现 "未登入, 已超时" 的错误.
-	db.StartedAt = time.Now()
+	sessionManager.Add(w, mimaDB.NewID())
 
 	http.Redirect(w, r, "/home/", http.StatusFound)
 }
 
 func logoutHandler(w httpRW, _ httpReq) {
-	logout()
+	logout(w)
 	info := &Feedback{Info: errors.New("已登出, 请重新登入")}
 	checkErr(w, templates.ExecuteTemplate(w, "login", info))
 }
@@ -161,7 +169,7 @@ func setupIBM(w httpRW, r httpReq) {
 		checkErrForSetupIBM(w, err.Error(), &settings)
 		return
 	}
-	if isLoggedOut() {
+	if isLoggedOut(r) {
 		checkErrForSetupIBM(w, "未登入(或已登出)", &settings)
 		return
 	}
@@ -230,7 +238,7 @@ func recoverFromIBM(w httpRW, r httpReq) {
 
 func getSettings(r httpReq, needObjName bool) (settings Settings, err error) {
 	var prefix string
-	prefix, err = mimaDB.NewID()
+	prefix = mimaDB.NewID()
 	settings = Settings{
 		ApiKey:            strings.TrimSpace(r.FormValue("apiKey")),
 		ServiceInstanceID: strings.TrimSpace(r.FormValue("serviceInstanceID")),
@@ -584,12 +592,13 @@ func checkErr(w httpRW, err error) {
 	}
 }
 
-func logout() {
+func logout(w httpRW) {
 	db.Reset()
+	sessionManager.DeleteSID(w)
 }
 
-func isLoggedOut() bool {
-	return db.IsNotInit()
+func isLoggedOut(r httpReq) bool {
+	return db.IsNotInit() || !sessionManager.Check(r)
 }
 
 // 复制到剪贴板, 并在一定时间后清空剪贴板.

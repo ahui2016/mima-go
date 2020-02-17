@@ -137,6 +137,10 @@ func (db *DB) Rebuild(userKey *SecretKey) (tarballFile string, err error) {
 	return
 }
 
+func (db *DB) UserKey() SecretKey {
+	return *db.userKey
+}
+
 // rewriteDBFile 覆盖重写数据库文件, 将其更新为当前内存数据库的内容.
 func (db *DB) rewriteDBFile() error {
 	dbFile, err := os.Create(db.FullPath)
@@ -677,4 +681,9 @@ func (db *DB) DeleteHistoryItem(id string, datetime string) error {
 		return err
 	}
 	return db.sealAndWriteFrag(mima, Update)
+}
+
+func (db *DB) IsExpired() bool {
+	expired := db.StartedAt.Add(db.ValidTerm)
+	return time.Now().After(expired)
 }

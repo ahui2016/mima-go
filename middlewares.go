@@ -10,33 +10,34 @@ func checkState(fn httpHF) httpHF {
 	db.Lock()
 	defer db.Unlock()
 	return func(w httpRW, r httpReq) {
-		// 已登入
-		if !isLoggedOut() {
-			if isExpired() {
-				// 超时.
-				logout()
-				err := &Feedback{Err: errors.New("超时自动登出, 请重新登录")}
-				checkErr(w, templates.ExecuteTemplate(w, "login", err))
-				return
-			}
-
-			// 未超时, 重新计时.
-			db.StartedAt = time.Now()
-			fn(w, r)
-			return
-		}
-
 		// 数据库不存在, 需要创建新账号.
 		if db.FileNotExist() {
 			checkErr(w, templates.ExecuteTemplate(w, "create-account", nil))
 			return
 		}
-
-		// 已存在数据库, 但未登入(已登出)
-		checkErr(w, templates.ExecuteTemplate(w, "login", nil))
+		// 已存在数据库, 但数据库未初始化 (未登入/已登出)
+		if db.IsNotInit() {
+			checkErr(w, templates.ExecuteTemplate(w, "login", nil))
+			return
+		}
+		// 数据库超时, 或者 session 验证失败
+		if db.IsExpired() || !sessionManager.Check(r) {
+			// 假设客户端 A 登入成功后, 客户端 B 尝试登陆, 会导致 logout (即 A 也被强行登出).
+			// 但如果 B 紧接着输入了正确密码成功登入, 则 A 也会自动再次变成已登入状态.
+			// 这可以说是一个 bug, 但恰好可以发现有人尝试登入, 所以也可以说这是一个 feature.
+			logout(w)
+			err := &Feedback{Err: errors.New("超时或session过期, 请重新登录")}
+			checkErr(w, templates.ExecuteTemplate(w, "login", err))
+			return
+		}
+		// 已创建数据库, 已登入, 数据库未超时, 并且 session 验证也成功
+		db.StartedAt = time.Now()
+		fn(w, r)
 	}
 }
 
+// checkLogin 用于 Add 和 Edit 页面, 不检查超时.
+// 不检查超时, 但还是要顺便更新有效时长.
 func checkLogin(fn httpHF) httpHF {
 	db.Lock()
 	defer db.Unlock()
@@ -47,20 +48,14 @@ func checkLogin(fn httpHF) httpHF {
 			return
 		}
 		// 未登入(已登出)
-		if isLoggedOut() {
+		if isLoggedOut(r) {
 			checkErr(w, templates.ExecuteTemplate(w, "login", nil))
 		}
 		// 已登入
+		db.StartedAt = time.Now()
 		fn(w, r)
 		return
 	}
-}
-
-func isExpired() bool {
-	db.RLock()
-	defer db.RUnlock()
-	expired := db.StartedAt.Add(db.ValidTerm)
-	return time.Now().After(expired)
 }
 
 func noCache(fn httpHF) httpHF {
@@ -77,13 +72,13 @@ func copyInBackground(fn func(*Mima)) httpHF {
 	db.Lock()
 	defer db.Unlock()
 	return func(w httpRW, r httpReq) {
-		if !isLoggedOut() && isExpired() {
+		if !isLoggedOut(r) && db.IsExpired() {
 			// 已登入, 但超时.
-			logout()
+			logout(w)
 			http.Error(w, "超时自动登出, 请重新登录", http.StatusNotAcceptable)
 			return
 		}
-		if isLoggedOut() {
+		if isLoggedOut(r) {
 			http.Error(w, "未登入(或已登出)", http.StatusNotAcceptable)
 			return
 		}

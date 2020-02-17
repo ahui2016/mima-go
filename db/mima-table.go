@@ -49,9 +49,7 @@ func NewMima(title string) (*Mima, error) {
 		return nil, err
 	}
 	mima := new(Mima)
-	if mima.ID, err = NewID(); err != nil {
-		return nil, err
-	}
+	mima.ID = NewID()
 	mima.Title = title
 	mima.Nonce = nonce
 	mima.CreatedAt = time.Now().UnixNano()
