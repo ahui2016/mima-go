@@ -3,11 +3,18 @@
 
 <p class="top-banner"><a href="/home">mima-go</a> .. <strong>Recycle Bin</strong></p>
 
+<hr />
 <div id="more-than-10" style="display: none">
-    <hr />
-    <p class="delete-tarballs-button"><a href="/delete-tarballs">删除备份文件</a></p>
+    <p style="text-align:right">
+        <span class="delete-tarballs-button"><a href="/delete-tarballs">删除备份文件</a></span>
+        . <a href="/index">Index</a>
+    </p>
 </div>
-<div id="less-than-10" style="display: none"><hr style="margin-bottom: 2em;" /></div>
+<div id="less-than-10" style="display: none">
+    <p style="text-align:right">
+        <a href="/index">Index</a>
+    </p>
+</div>
 
 <ul>
     {{range .}}

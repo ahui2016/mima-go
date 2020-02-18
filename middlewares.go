@@ -26,7 +26,7 @@ func checkState(fn httpHF) httpHF {
 			// 但如果 B 紧接着输入了正确密码成功登入, 则 A 也会自动再次变成已登入状态.
 			// 这可以说是一个 bug, 但恰好可以发现有人尝试登入, 所以也可以说这是一个 feature.
 			logout(w)
-			err := &Feedback{Err: errors.New("超时或session过期, 请重新登录")}
+			err := &Feedback{Err: errors.New("超时或session验证失败, 请重新登录")}
 			checkErr(w, templates.ExecuteTemplate(w, "login", err))
 			return
 		}

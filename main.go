@@ -57,7 +57,9 @@ func main() {
 	term := getTerm()
 	db.ValidTerm = time.Minute * time.Duration(term)
 	fmt.Println(addr, "time limit:", term, "minutes")
-	sessionManager = NewSessionManager(time.Hour * 12) // 默认 session 有效期为 12 小时
+	// 默认 session 有效期为 2 小时, 改时间每次 logout 再 login 时重新计算.
+	// 这个参数实际上限制了命令行 -term 参数的最长时间.
+	sessionManager = NewSessionManager(time.Hour * 2)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
 
@@ -301,7 +303,7 @@ func backupToCloud(w httpRW, r httpReq) {
 	}
 	// 显示成功信息
 	cloudInfo := getCloudInfo()
-	cloudInfo.Info = "云备份成功! 最新的云端备份信息如下所示:"
+	cloudInfo.Info = "云备份成功! "
 	checkErr(w, templates.ExecuteTemplate(w, "backup-to-cloud", cloudInfo))
 }
 
@@ -488,6 +490,7 @@ func deleteTarballs(w httpRW, r httpReq) {
 			fb.Err = err
 		}
 	}
+	fb.Info = errors.New("已成功删除一部分备份文件")
 	checkErr(w, templates.ExecuteTemplate(w, "delete-tarballs", fb))
 }
 
