@@ -1,7 +1,6 @@
 # Todo
 
-- 自动打开网页 (AutoHotKey?)
-- 浏览历史 (取代浏览器后退键)
+- iOS版本 (但只做 viewer, 不提供编辑功能)
 
 ## 特色: Alias
 
