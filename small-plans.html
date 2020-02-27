@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Small Plans</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        h1 a {
+            font-size: small;
+            text-decoration: none;
+        }
+        #todo-input {
+            width: 634px;
+            height: 2.5em;
+            font-size: inherit;
+            border: 1px solid blue;
+            padding: 0 3px 0 3px;
+        }
+        details {
+            margin-bottom: 20px;
+            width: 100%;
+            /*font-family: sans-serif;*/
+            font-family: "Palatino Linotype", Palatino, Palladio, Baskerville,Georgia, sans-serif, serif;
+        }
+        details pre {
+            padding: 10px 20px 20px 20px;
+            white-space: pre-wrap;
+            white-space: -moz-pre-wrap;
+        }
+        summary {
+            /*padding: 20px 20px 20px 38px;*/
+            /*text-indent: -18px;*/
+            padding: 20px;
+            border: 1px solid #9fb6ce;
+            outline: none;
+            list-style: none;
+        }
+        summary::-webkit-details-marker {
+            display: none;
+        }
+        summary:hover,
+        summary:focus {
+            border: 1px solid black;
+        }
+        details.undone summary {
+            background-color: #f2f9fb;
+        }
+        details.done summary {
+            background-color: white;
+        }
+        details[open] {
+            background-color: #fafafa;
+            border: 1px solid #9fb6ce;
+        }
+        details[open] summary {
+            border-width: 0 0 1px 0;
+            border-style: solid;
+            border-color: #9fb6ce;
+        }
+        section {
+            width: 640px;
+        }
+        .cell.buttons {
+            padding-right: 0.5em;
+            text-align: right;
+        }
+        .cell.buttons a {
+            text-decoration: none;
+            color: lightseagreen;
+        }
+        textarea {
+            width: 100%;
+            resize: none;
+        }
+        .DateAndButtons {
+            display: flex;
+        }
+        .cell {
+            flex: 1;
+        }
+        .cell.date {
+            padding-left: 0.5em;
+            color: #ddd;
+        }
+        .cell.date a {
+            color: #ddd;
+            text-decoration: none;
+        }
+        .cell.date a:hover {
+            color: lightseagreen;
+        }
+        #export-import-buttons {
+            color: #ddd;
+            margin-top: 1em;
+            margin-bottom: 3em;
+        }
+        #export-import-buttons a {
+            color: #ddd;
+            text-decoration: none;
+        }
+        #export-import-buttons a:hover {
+            color: blue;
+        }
+        .todo-tag {
+            font-size: small;
+            font-weight: bold;
+            color: white;
+            display: inline-block;
+            padding: 0 5px 0 5px;
+            border-radius: 5px;
+            background-color: mediumaquamarine;
+        }
+    </style>
+    <script>
+        // https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API/Using_the_Web_Storage_API
+        function storageAvailable(type) {
+            let storage;
+            try {
+                storage = window[type];
+                let x = '__storage_test__';
+                storage.setItem(x, x);
+                storage.removeItem(x);
+                return true;
+            }
+            catch(e) {
+                return e instanceof DOMException && (
+                        // everything except Firefox
+                    e.code === 22 ||
+                    // Firefox
+                    e.code === 1014 ||
+                    // test name field too, because code might not be present
+                    // everything except Firefox
+                    e.name === 'QuotaExceededError' ||
+                    // Firefox
+                    e.name === 'NS_ERROR_DOM_QUOTA_REACHED') &&
+                    // acknowledge QuotaExceededError only if there's something already stored
+                    (storage && storage.length !== 0);
+            }
+        }
+        function newTodoItem(summary, tag) {
+            let now = Date.now();
+            return {
+                id: `todoitem-${now.toString(36)}`,
+                summary: summary,
+                details: '',
+                tag: tag,
+                createdAt: now,
+                updatedAt: now,
+                doneAt: null,
+                deletedAt: null,
+            }
+        }
+        function simpleDate(timestamp) {
+            const date = new Date(timestamp);
+            let year = '' + date.getFullYear(),
+                month = '' + (date.getMonth() + 1),
+                day = '' + date.getDate();
+            if (month.length < 2) month = '0' + month;
+            if (day.length < 2) day = '0' + day;
+            return [year, month, day].join('-');
+        }
+        function clearAndFillLocalStorage(db) {
+            localStorage.clear();
+            localStorage.setItem('projectTitle', db.projectTitle);
+            localStorage.setItem('projectDescription', db.projectDescription);
+            for (let item of db.undoneItems) {
+                localStorage.setItem(item.id, JSON.stringify(item));
+            }
+            for (let item of db.doneItems) {
+                localStorage.setItem(item.id, JSON.stringify(item));
+            }
+            for (let item of db.deletedItems) {
+                localStorage.setItem(item.id, JSON.stringify(item));
+            }
+        }
+        function splitTagSummary(s) {
+            let summary = s.trim();
+            let tag = '';
+            if (summary.charAt(0) === '#') {
+                let i = summary.indexOf('#', 1);
+                if (i !== -1) {
+                    tag = summary.substring(1, i).trim();
+                    summary = summary.substring(i+1).trim();
+                }
+            }
+            return {tag, summary}
+        }
+    </script>
+</head>
+<body>
+
+<h1><span id="project-title">Small Plans</span><a href="#" id="proj-title-btn"> 📝</a></h1>
+<h2 id="project-description"></h2>
+<!-- https://dev.to/ananyaneogi/html-can-do-that-c0n -->
+<dialog id="proj-title-dialog"
+        style="width: 450px; height: 240px; position: absolute; top: 20px; padding: 1em 2em 0 2em;">
+    <form autocomplete="off">
+        <p>
+            <label class="projectLabel" for="project-title-input">Project Title:</label><br/>
+            <input type="text" id="project-title-input" style="width: 100%; height: 2em;" />
+        </p>
+        <p>
+            <label class="projectLabel" for="description-input">Description:</label>
+            <textarea id="description-input" class="field" rows="3"></textarea>
+        </p>
+        <p style="text-align: right;">
+            <input type="submit" disabled hidden><!--防止 enter 键提交表单-->
+            <input id="proj-title-ok" type="button" value="ok">
+            <button id="proj-title-cancel">cancel</button>
+        </p>
+    </form>
+</dialog>
+
+<div id="export-import-buttons">
+    <a href="#" id="export-btn">export</a> | <a href="#" id="import-dialog-open">import</a>
+</div>
+<dialog id="import-dialog"
+        style="width: 450px; height: 200px; position: absolute; top: 50px; padding: 2em;">
+    <p>请先选择文件, 然后点击 import 按钮.</p>
+    <p><span style="color: red">注意:</span> 一旦导入, 当前数据将被清空、覆盖!</p>
+    <form id="import-form" autocomplete="off" style="margin-top: 2em;">
+        <input type="file" id="import-file">
+        <button id="import-btn">import</button>
+        <p style="margin-top: 3em; text-align: right;"><button id="import-dialog-close">close</button></p>
+    </form>
+</dialog>
+<dialog id="export-dialog"
+        style="width: 450px; height: 200px; position: absolute; top: 50px; padding: 2em;">
+    <p>请右键点击以下链接, 另存为文件</p>
+    <p><a href="#" id="json-url" download="small-plans.json">small-plans.json</a></p>
+    <p>建议连同 small-plans.html 一起保存在你的项目的根目录。</p>
+    <form style="margin-top: 3em; text-align: right;">
+        <button id="export-dialog-close">close</button>
+    </form>
+</dialog>
+
+<template id="todo-template">
+    <div class="todo-top-div">
+        <dialog style="width: 500px; height: 300px; position: absolute; padding: 2em;">
+            <form autocomplete="off">
+                <p>
+                    <label>Tag: <input type="text" class="todo-tag-input" /></label>
+                </p>
+                <p>
+                    <label>Summary:<br/>
+                        <input type="text" class="todo-summary-input" style="width: 100%; height: 2em;" />
+                    </label>
+                </p>
+                <p>
+                    <label>Details:<br/>
+                        <textarea class="todo-details-input" rows="6"></textarea>
+                    </label>
+                </p>
+                <p style="text-align: right;">
+                    <input type="submit" disabled hidden><!--防止 enter 键提交表单-->
+                    <button class="todo-edit-ok">ok</button>
+                    <button class="todo-edit-cancel">cancel</button>
+                </p>
+            </form>
+        </dialog>
+
+        <!-- https://dev.to/ananyaneogi/html-can-do-that-c0n -->
+        <details class="undone">
+            <summary>
+                <span class="todo-tag"></span>
+                <span class="todo-summary">NEED SUMMARY</span>
+                <span class="more-btn" hidden
+                      style="color: #9fb6ce;cursor: pointer;">(more)</span>
+            </summary>
+            <div class="DateAndButtons">
+                <div class="cell date">
+                    <span class="deleted-at" hidden></span>
+                    <span class="done-at" hidden></span>
+                    <a href="#" class="undoneBtn" hidden>(undone)</a>
+                    <a href="#" class="doneBtn">(done)</a>
+                </div>
+                <div class="cell buttons normal">
+                    <a href="#" class="editBtn">edit</a> . <a href="#" class="deleteBtn">delete</a>
+                </div>
+                <div class="cell buttons deleted" hidden>
+                    <a href="#" class="restoreBtn">restore</a> | <a href="#" class="deleteForeverBtn">delete forever</a>
+                </div>
+            </div>
+            <pre class="todo-details"></pre>
+        </details>
+    </div>
+</template>
+
+<section id="all-undone-elem"></section>
+
+<form id="add-todo-form" autocomplete="off"
+      style="width: 640px; margin-top: 1em; margin-bottom: 3em;">
+    <label for="todo-input" style="font-weight: bold;">Add Todo:</label><br/>
+    <input type="text" id="todo-input" />
+</form>
+
+<section id="all-done-elem"></section>
+<section id="all-deleted-elem"></section>
+
+<script>
+    if (!storageAvailable('localStorage')) {
+        window.alert("当前浏览器不支持 localStorage, 可能无法正常使用本网页, 请使用支持 localStorage 的浏览器.")
+    }
+    const projTitle = document.getElementById('project-title');
+    const projTitleInput =  document.getElementById('project-title-input');
+    const projDescription = document.getElementById('project-description');
+    const projDescriptionInput = document.getElementById('description-input');
+    let undoneItems = [];
+    let doneItems = [];
+    let deletedItems = [];
+    const allUndoneElem = document.querySelector('#all-undone-elem');
+    const allDoneElem = document.querySelector('#all-done-elem');
+    const allDeletedElem = document.querySelector('#all-deleted-elem');
+    const todoTemplate = document.querySelector('#todo-template');
+
+    function getDB() {
+        return {
+            projectTitle: localStorage.getItem('projectTitle'),
+            projectDescription: localStorage.getItem('projectDescription'),
+            undoneItems: undoneItems,
+            doneItems: doneItems,
+            deletedItems: deletedItems,
+        }
+    }
+    const importDialog = document.querySelector('#import-dialog');
+    document.querySelector('#import-dialog-open').addEventListener('click', event => {
+        event.preventDefault();
+        importDialog.setAttribute('open', '');
+    });
+    document.querySelector('#import-btn').addEventListener('click', function(event) {
+        event.preventDefault();
+        const file = document.querySelector('#import-file').files[0];
+        const reader = new FileReader();
+        reader.onerror = function () {
+            window.alert("导入文件失败!");
+        }
+        reader.onload = function () {
+            let db = JSON.parse(reader.result);
+            clearAndFillLocalStorage(db);
+            window.location.reload();
+        }
+        reader.readAsText(file);
+    });
+    document.querySelector('#import-dialog-close').addEventListener('click', event => {
+        event.preventDefault();
+        importDialog.removeAttribute('open');
+    })
+    function showJsonUrl() {
+        let dbBlob = new Blob([JSON.stringify(getDB(), null, 2)], {type: 'application/json'});
+        let jsonUrl = window.URL.createObjectURL(dbBlob);
+        document.querySelector('#json-url').setAttribute('href', jsonUrl);
+    }
+    const exportDialog = document.querySelector('#export-dialog');
+    document.querySelector('#export-btn').addEventListener('click', function (event) {
+        event.preventDefault();
+        exportDialog.setAttribute('open', '');
+        showJsonUrl();
+    });
+    document.querySelector('#export-dialog-close').addEventListener('click', event => {
+        event.preventDefault();
+        exportDialog.removeAttribute('open');
+    })
+
+    // 这个函数很大, 因为很多按钮也在里面.
+    // 注意: 每当修改 todoitem 的内容时, 都要更新 localStorage.
+    function insertTodoElem(todoitem) {
+        const todoElem = todoTemplate.content.cloneNode(true);
+        const todoTopDiv = todoElem.querySelector('.todo-top-div');
+        const todoTag = todoTopDiv.querySelector('.todo-tag');
+        const todoDetails = todoTopDiv.querySelector('details');
+        const doneAt = todoTopDiv.querySelector('.done-at');
+        const deletedAt = todoTopDiv.querySelector('.deleted-at');
+        const doneBtn = todoTopDiv.querySelector('.doneBtn');
+        const undoneBtn = todoTopDiv.querySelector('.undoneBtn');
+        const deleteBtn = todoTopDiv.querySelector('.deleteBtn');
+        const restoreBtn = todoTopDiv.querySelector('.restoreBtn');
+        const deleteForeverBtn = todoTopDiv.querySelector('.deleteForeverBtn');
+        const todoButtonsNormal = todoTopDiv.querySelector('.cell.buttons.normal');
+        const todoButtonsDeleted = todoTopDiv.querySelector('.cell.buttons.deleted');
+        function setDoneAttributes(todoitem) {
+            todoDetails.setAttribute('class', 'done');
+            doneAt.removeAttribute('hidden');
+            doneAt.innerText = `done at: ${simpleDate(todoitem.doneAt)}`;
+            undoneBtn.removeAttribute('hidden');
+            doneBtn.setAttribute('hidden', '');
+        }
+        function setDeletedAttributes(todoitem) {
+            todoDetails.setAttribute('class', 'done');
+            todoSummary.style.textDecoration = 'line-through';
+            deletedAt.removeAttribute('hidden');
+            deletedAt.innerText = `deleted at: ${simpleDate(todoitem.deletedAt)}`;
+            doneAt.setAttribute('hidden', '');
+            undoneBtn.setAttribute('hidden', '');
+            doneBtn.setAttribute('hidden', '');
+            todoButtonsNormal.setAttribute('hidden', '');
+            todoButtonsDeleted.removeAttribute('hidden');
+        }
+        function setRestoreAttributes(todoitem) {
+            todoDetails.setAttribute('class', 'done');
+            todoSummary.style.textDecoration = 'none';
+            deletedAt.setAttribute('hidden', '');
+            doneBtn.removeAttribute('hidden');
+            todoButtonsDeleted.setAttribute('hidden', '');
+            todoButtonsNormal.removeAttribute('hidden');
+        }
+        doneBtn.addEventListener('click', function(event) {
+            event.preventDefault();
+            todoitem.doneAt = Date.now();
+            todoitem.updatedAt = todoitem.doneAt;
+            if (todoitem.tag === 'bug') {
+                todoitem.tag = 'fixed';
+                todoTag.innerText = 'fixed';
+            }
+            localStorage.setItem(todoitem.id, JSON.stringify(todoitem));
+            let i = undoneItems.findIndex(item => item.id === todoitem.id);
+            undoneItems.splice(i, 1);
+            doneItems.push(todoitem);
+            setDoneAttributes(todoitem);
+            if (!todoitem.details) todoDetails.removeAttribute('open');
+            let elem = document.querySelector(`#${todoitem.id}`);
+            allDoneElem.insertBefore(elem, allDoneElem.firstElementChild);
+        });
+        undoneBtn.addEventListener('click', event => {
+            event.preventDefault();
+            todoitem.doneAt = null;
+            if (todoitem.tag === 'fixed') {
+                todoitem.tag = 'bug';
+                todoTag.innerText = 'bug';
+            }
+            todoitem.updatedAt = Date.now();
+            localStorage.setItem(todoitem.id, JSON.stringify(todoitem));
+            let i = doneItems.findIndex(item => item.id === todoitem.id);
+            doneItems.splice(i, 1);
+            undoneItems.push(todoitem);
+            todoDetails.setAttribute('class', 'undone');
+            doneAt.setAttribute('hidden', '');
+            doneAt.innerText = '';
+            undoneBtn.setAttribute('hidden', '');
+            doneBtn.removeAttribute('hidden');
+            if (!todoitem.details) todoDetails.removeAttribute('open');
+            let elem = document.querySelector(`#${todoitem.id}`);
+            allUndoneElem.appendChild(elem);
+        });
+        deleteBtn.addEventListener('click', event => {
+            event.preventDefault();
+            todoitem.doneAt = null;
+            todoitem.deletedAt = Date.now();
+            todoitem.updatedAt = todoitem.deletedAt;
+            localStorage.setItem(todoitem.id, JSON.stringify(todoitem));
+            if (todoitem.doneAt) {
+                let i = doneItems.findIndex(item => item.id === todoitem.id);
+                doneItems.splice(i, 1);
+            } else {
+                let i = undoneItems.findIndex(item => item.id === todoitem.id);
+                undoneItems.splice(i, 1);
+            }
+            deletedItems.push(todoitem);
+            setDeletedAttributes(todoitem);
+            if (!todoitem.details) todoDetails.removeAttribute('open');
+            let elem = document.querySelector(`#${todoitem.id}`);
+            allDeletedElem.insertBefore(elem, allDeletedElem.firstElementChild);
+        });
+        restoreBtn.addEventListener('click', event => {
+            event.preventDefault();
+            todoitem.deletedAt = null;
+            if (todoitem.tag === 'fixed') {
+                todoitem.tag = 'bug';
+                todoTag.innerText = 'bug';
+            }
+            todoitem.updatedAt = Date.now();
+            localStorage.setItem(todoitem.id, JSON.stringify(todoitem));
+            let i = deletedItems.findIndex(item => item.id === todoitem.id);
+            deletedItems.splice(i, 1);
+            undoneItems.push(todoitem);
+            setRestoreAttributes(todoitem);
+            if (!todoitem.details) todoDetails.removeAttribute('open');
+            let elem = document.querySelector(`#${todoitem.id}`);
+            allUndoneElem.appendChild(elem);
+        });
+        todoTopDiv.setAttribute('id', todoitem.id);
+        let moreBtn = todoTopDiv.querySelector('.more-btn');
+        if (todoitem.details) {
+            moreBtn.removeAttribute('hidden');
+        }
+        todoTag.innerText = todoitem.tag;
+        const todoSummary = todoTopDiv.querySelector('.todo-summary');
+        todoSummary.innerText = todoitem.summary;
+        let pre = todoTopDiv.querySelector('.todo-details');
+        pre.innerText = todoitem.details;
+        let summary = todoTopDiv.querySelector('summary');
+        summary.addEventListener('click', function() {
+            if (todoDetails.hasAttribute('open') && pre.innerText.trim()) {
+                moreBtn.removeAttribute('hidden');
+            } else {
+                moreBtn.setAttribute('hidden', '');
+            }
+        });
+        const todoEditDialog = todoTopDiv.querySelector('dialog');
+        const todoTagInput = todoTopDiv.querySelector('.todo-tag-input');
+        const todoSummaryInput = todoTopDiv.querySelector('.todo-summary-input');
+        const todoDetailsInput = todoTopDiv.querySelector('.todo-details-input');
+        const todoEditOk = todoTopDiv.querySelector('.todo-edit-ok');
+        const todoEditCancel = todoTopDiv.querySelector('.todo-edit-cancel');
+        todoTopDiv.querySelector('.editBtn').addEventListener('click', function (event) {
+            event.preventDefault();
+            todoTagInput.value = todoitem.tag;
+            todoSummaryInput.value = todoitem.summary;
+            todoDetailsInput.value = todoitem.details;
+            todoEditDialog.setAttribute('open', '');
+            todoSummaryInput.focus();
+        });
+        todoEditCancel.addEventListener('click', function (event) {
+            event.preventDefault();
+            todoEditDialog.removeAttribute('open');
+        });
+        todoEditOk.addEventListener('click', function (event) {
+            event.preventDefault();
+            todoitem.tag = todoTagInput.value.trim();
+            todoitem.summary = todoSummaryInput.value.trim();
+            // pre 的内容不删除前后空格, 但当其内容只有空格时则清空.
+            let preText = todoDetailsInput.value;
+            if (preText.trim() === '') {
+                preText = '';
+            }
+            todoitem.details = preText;
+            todoitem.updatedAt = Date.now();
+            todoTag.innerText = todoitem.tag;
+            todoSummary.innerText = todoitem.summary;
+            pre.innerText = todoitem.details;
+            localStorage.setItem(todoitem.id, JSON.stringify(todoitem));
+            todoEditDialog.removeAttribute('open');
+        });
+        if (todoitem.deletedAt) {
+            setDeletedAttributes(todoitem);
+            allDeletedElem.insertBefore(todoElem, allDeletedElem.firstElementChild);
+        }
+        if (todoitem.doneAt) {
+            setDoneAttributes(todoitem);
+            allDoneElem.insertBefore(todoElem, allDoneElem.firstElementChild);
+        } else {
+            allUndoneElem.appendChild(todoElem);
+        }
+    }
+
+    // 以上是设置, 从这里开始使页面发生可见的变化.
+    if (localStorage.getItem('projectTitle')) {
+        projTitle.innerText = localStorage.getItem('projectTitle');
+        if (projTitle.innerText === '') projTitle.innerText = 'Small Plans';
+    }
+    if (localStorage.getItem('projectDescription')) {
+        projDescription.innerText = localStorage.getItem('projectDescription');
+    }
+    for (let i = 0; i < localStorage.length; i++) {
+        let key = localStorage.key(i);
+        if (key.startsWith('todoitem-')) {
+            let item = JSON.parse(localStorage.getItem(key));
+            if (item.deletedAt) {
+                deletedItems.push(item);
+            } else if (item.doneAt) {
+                doneItems.push(item);
+            } else {
+                undoneItems.push(item);
+            }
+        }
+    }
+    undoneItems.sort((a, b) => {
+        return a.updatedAt - b.updatedAt;
+    });
+    doneItems.sort((a, b) => {
+        return a.doneAt - b.doneAt;
+    });
+    deletedItems.sort((a, b) => {
+        return a.deletedAt - b.deletedAt;
+    });
+    for (let item of undoneItems) insertTodoElem(item);
+    for (let item of doneItems) insertTodoElem(item);
+    for (let item of deletedItems) insertTodoElem(item);
+
+    const todoInput = document.getElementById('todo-input');
+    todoInput.focus();
+
+    const projTitleDialog = document.getElementById('proj-title-dialog');
+    const projTitleBtn = document.getElementById('proj-title-btn');
+    const projTitleOk = document.getElementById('proj-title-ok');
+    const projTitleCancel = document.getElementById('proj-title-cancel');
+    projTitleBtn.addEventListener('click', function() {
+        projTitleInput.value = localStorage.getItem('projectTitle');
+        projDescriptionInput.value = localStorage.getItem('projectDescription');
+        projTitleDialog.setAttribute('open', '');
+        projTitleInput.focus();
+    });
+    projTitleCancel.addEventListener('click', function(event) {
+        event.preventDefault();
+        projTitleDialog.removeAttribute('open');
+    });
+    projTitleOk.addEventListener('click', function(event) {
+        event.preventDefault();
+        projTitle.innerText = projTitleInput.value.trim();
+        localStorage.setItem('projectTitle', projTitle.innerText);
+        projDescription.innerText = projDescriptionInput.value.trim();
+        localStorage.setItem('projectDescription', projDescription.innerText);
+        projTitleDialog.removeAttribute('open');
+    });
+    // projTitleInput.addEventListener('keyup', (event) => {
+    //     if (event.key === 'Escape') {
+    //         projTitleDialog.removeAttribute('open');
+    //     }
+    // });
+    const addTodoForm = document.getElementById('add-todo-form');
+    addTodoForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        let todo = todoInput.value.trim();
+        let {tag, summary} = splitTagSummary(todo);
+        let item = newTodoItem(summary, tag);
+        localStorage.setItem(item.id, JSON.stringify(item));
+        undoneItems.push(item);
+        insertTodoElem(item);
+        todoInput.value = '';
+        todoInput.focus();
+    });
+</script>
+</body>
+</html>
