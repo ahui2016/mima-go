@@ -1,5 +1,5 @@
 # mima-go
- mima-go is a password manager.
+ mima-go is a password manager. 一个有特色的密码管理工具。
  
  - 这是一个桌面版的密码管理器.
  - 可备份至云端.

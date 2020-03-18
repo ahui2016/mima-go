@@ -3,7 +3,7 @@
   "projectDescription": "mima-go is a password manager",
   "undoneItems": [
     {
-      "id": "todoitem-k749llu3",
+      "id": "k749llu3",
       "summary": "iOS 端",
       "details": "只做一个 viewer (只可浏览, 不可编辑)\n",
       "tag": "新版本",
@@ -13,7 +13,7 @@
       "deletedAt": null
     },
     {
-      "id": "todoitem-k749qrtb",
+      "id": "k749qrtb",
       "summary": "多终端同步",
       "details": "要不要做？再想想。",
       "tag": "功能",
