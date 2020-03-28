@@ -21,6 +21,26 @@
       "updatedAt": 1582779026367,
       "doneAt": null,
       "deletedAt": null
+    },
+    {
+      "id": "k7xg0i8d",
+      "summary": "前后端分离",
+      "details": "",
+      "tag": "架构",
+      "createdAt": 1584543039565,
+      "updatedAt": 1584543039565,
+      "doneAt": null,
+      "deletedAt": null
+    },
+    {
+      "id": "k7y5kvzb",
+      "summary": "增加搜索功能",
+      "details": "- 先完全匹配搜索 alias\n- 如果找不到 alias, 则改为包含匹配搜索标题\n- 如果找不到标题，再搜索用户名",
+      "tag": "功能",
+      "createdAt": 1584585980903,
+      "updatedAt": 1584586114914,
+      "doneAt": null,
+      "deletedAt": null
     }
   ],
   "doneItems": [],
