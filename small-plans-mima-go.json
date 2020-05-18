@@ -13,16 +13,6 @@
       "deletedAt": null
     },
     {
-      "id": "k749qrtb",
-      "summary": "多终端同步",
-      "details": "要不要做？再想想。",
-      "tag": "功能",
-      "createdAt": 1582778988623,
-      "updatedAt": 1582779026367,
-      "doneAt": null,
-      "deletedAt": null
-    },
-    {
       "id": "k7xg0i8d",
       "summary": "前后端分离",
       "details": "",
@@ -41,8 +31,39 @@
       "updatedAt": 1584586114914,
       "doneAt": null,
       "deletedAt": null
+    },
+    {
+      "id": "k8gqxe8g",
+      "summary": "用 Go 做一个 cli",
+      "details": "",
+      "tag": "tool",
+      "createdAt": 1585710227536,
+      "updatedAt": 1585710245181,
+      "doneAt": null,
+      "deletedAt": null
+    },
+    {
+      "id": "k8gqzsxw",
+      "summary": "部署成网站",
+      "details": "",
+      "tag": "web",
+      "createdAt": 1585710339908,
+      "updatedAt": 1585710339908,
+      "doneAt": null,
+      "deletedAt": null
     }
   ],
   "doneItems": [],
-  "deletedItems": []
+  "deletedItems": [
+    {
+      "id": "k749qrtb",
+      "summary": "多终端同步",
+      "details": "要不要做？再想想。",
+      "tag": "功能",
+      "createdAt": 1582778988623,
+      "updatedAt": 1582779026367,
+      "doneAt": null,
+      "deletedAt": 1585710285104
+    }
+  ]
 }
