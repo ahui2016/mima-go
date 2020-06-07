@@ -1,3 +1,5 @@
+该项目已转移至 https://github.com/ahui2016/mima-web
+
 # mima-go
  mima-go is a password manager. 一个有特色的密码管理工具。
  
